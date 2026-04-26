@@ -1,0 +1,17 @@
+{
+  "name": "waresource-bot-md",
+  "version": "1.0.0",
+  "description": "WhatsApp MD bot with menu, stiker, menfess, and brat commands.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.26.0"
+  }
+}
