@@ -3,3 +3,4 @@ node_modules/
 .npm-cache/
 .wwebjs_auth/
 .wwebjs_cache/
+gcm-diagnose.log

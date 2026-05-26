@@ -1,3 +1,5 @@
+const { success, warn } = require("./_style");
+
 function endSession(state, userJid) {
   const session = state.activeMenfess.get(userJid);
   if (!session) return null;
@@ -14,22 +16,22 @@ module.exports = {
   usage: "endconfess",
   async execute({ client, message, state, helpers }) {
     if (!helpers.isPrivateUserChat(message)) {
-      await message.reply("Command ini hanya bisa dipakai di chat private bot.");
+      await message.reply(warn("Command ini hanya bisa dipakai di chat private bot."));
       return;
     }
 
     const session = endSession(state, message.from);
     if (!session) {
-      await message.reply("Tidak ada sesi menfess aktif.");
+      await message.reply(warn("Tidak ada sesi menfess aktif."));
       return;
     }
  
-    awaitmessage.reply("Sesi Menfess telah diakhiri.")
+    await message.reply(success("𝙼𝙴𝙽𝙵𝙴𝚂𝚂", "Sesi menfess telah diakhiri."));
     
     try {
       await client.sendMessage(
         session.peer,
-        "Sesi menfess telah diakhiri oleh lawan bicara."
+        success("𝙼𝙴𝙽𝙵𝙴𝚂𝚂", "Sesi menfess telah diakhiri oleh lawan bicara.")
       );
     } catch {
     }

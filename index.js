@@ -64,6 +64,11 @@ const LOGIN_METHOD_ENV =
   (process.env.LOGIN_METHOD || process.env.WA_LOGIN_METHOD || "").toLowerCase();
 const PAIRING_PHONE_ENV =
   process.env.PAIRING_PHONE || process.env.WA_PAIRING_PHONE || null;
+const PAIRING_SHOW_NOTIFICATION =
+  !["0", "false", "no", "off"].includes(
+    String(process.env.PAIRING_SHOW_NOTIFICATION || "").toLowerCase()
+  );
+const PAIRING_INTERVAL_MS = Number(process.env.PAIRING_INTERVAL_MS) || 180000;
 const WWEBJS_DATA_PATH =
   process.env.WWEBJS_DATA_PATH || path.join(__dirname, ".wwebjs_auth");
 const WWEBJS_CLIENT_ID = process.env.WWEBJS_CLIENT_ID || undefined;
@@ -81,26 +86,9 @@ const state = {
   },
 };
 
-const client = new Client({
-  authStrategy: new LocalAuth({
-    dataPath: WWEBJS_DATA_PATH,
-    clientId: WWEBJS_CLIENT_ID,
-  }),
-  puppeteer: {
-    headless: true,
-    executablePath: PUPPETEER_EXECUTABLE_PATH,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-    ],
-  },
-});
-
 let loginMethod = "qr";
 let pairingPhone = null;
-let pairingRequested = false;
-let qrShown = false;
+let client = null;
 
 function normalizeNumber(rawNumber) {
   const digits = String(rawNumber || "").replace(/\D/g, "");
@@ -140,7 +128,7 @@ function loadCommands() {
   const commandsDir = path.join(__dirname, "commands");
   const files = fs
     .readdirSync(commandsDir)
-    .filter((file) => file.endsWith(".js"))
+    .filter((file) => file.endsWith(".js") && !file.startsWith("_"))
     .sort();
 
   const commandMap = new Map();
@@ -182,14 +170,60 @@ function loadCommands() {
 
 const commands = loadCommands();
 
-async function askLoginMethod() {
+function createClient() {
+  const options = {
+    authStrategy: new LocalAuth({
+      dataPath: WWEBJS_DATA_PATH,
+      clientId: WWEBJS_CLIENT_ID,
+    }),
+    puppeteer: {
+      headless: true,
+      executablePath: PUPPETEER_EXECUTABLE_PATH,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+      ],
+    },
+  };
+
+  if (loginMethod === "pairing") {
+    options.pairWithPhoneNumber = {
+      phoneNumber: pairingPhone,
+      showNotification: PAIRING_SHOW_NOTIFICATION,
+      intervalMs: PAIRING_INTERVAL_MS,
+    };
+  }
+
+  return new Client(options);
+}
+
+function getAuthSessionPath() {
+  const sessionName = WWEBJS_CLIENT_ID ? `session-${WWEBJS_CLIENT_ID}` : "session";
+  return path.join(WWEBJS_DATA_PATH, sessionName);
+}
+
+function hasAuthSession() {
+  return fs.existsSync(getAuthSessionPath());
+}
+
+async function removeAuthSession() {
+  await fs.promises.rm(getAuthSessionPath(), {
+    recursive: true,
+    force: true,
+    maxRetries: 5,
+    retryDelay: 500,
+  });
+}
+
+function setEnvLoginMethod() {
   if (LOGIN_METHOD_ENV === "qr") {
     loginMethod = "qr";
     console.log("Mode login (env): QR Code");
-    return;
+    return true;
   }
 
-  if (LOGIN_METHOD_ENV === "pairing") {
+  if (LOGIN_METHOD_ENV === "pairing" || (!LOGIN_METHOD_ENV && PAIRING_PHONE_ENV)) {
     const normalized = normalizeNumber(PAIRING_PHONE_ENV);
     if (!normalized) {
       throw new Error(
@@ -200,100 +234,166 @@ async function askLoginMethod() {
     loginMethod = "pairing";
     pairingPhone = normalized;
     console.log(`Mode login (env): Pairing nomor (${pairingPhone})`);
-    return;
+    return true;
   }
 
-  const isInteractive = Boolean(input.isTTY && output.isTTY);
-  if (!isInteractive) {
-    loginMethod = "qr";
-    console.log("Mode login: QR Code (non-interactive environment)");
-    console.log(
-      "Tip: set LOGIN_METHOD=pairing dan PAIRING_PHONE=628xxxxxxxxxx untuk pairing tanpa prompt."
-    );
-    return;
-  }
+  return false;
+}
 
+async function askPairingPhone() {
   const rl = readline.createInterface({ input, output });
 
   try {
-    console.log("Pilih metode login WhatsApp:");
-    console.log("1. QR Code");
-    console.log("2. Pairing Nomor");
+    const rawPhone = await rl.question(
+      "Masukkan nomor WhatsApp (contoh 6281234567890 atau 081234567890): "
+    );
+    const normalized = normalizeNumber(rawPhone);
 
-    const choice = (await rl.question("Masukkan pilihan (1/2): ")).trim();
-
-    if (choice === "2") {
-      const rawPhone = await rl.question(
-        "Masukkan nomor WhatsApp (contoh 6281234567890 atau 081234567890): "
-      );
-      const normalized = normalizeNumber(rawPhone);
-
-      if (!normalized) {
-        throw new Error("Nomor tidak valid untuk pairing.");
-      }
-
-      loginMethod = "pairing";
-      pairingPhone = normalized;
-      console.log(`Mode login: Pairing nomor (${pairingPhone})`);
-      return;
+    if (!normalized) {
+      throw new Error("Nomor tidak valid untuk pairing.");
     }
 
-    loginMethod = "qr";
-    console.log("Mode login: QR Code");
+    loginMethod = "pairing";
+    pairingPhone = normalized;
+    console.log(`Mode login: Pairing nomor (${pairingPhone})`);
   } finally {
     rl.close();
   }
 }
 
-async function requestPairingCodeWithRetry() {
-  if (loginMethod !== "pairing" || pairingRequested) return;
+async function configureStartupSession() {
+  const sessionExists = hasAuthSession();
 
-  if (typeof client.requestPairingCode !== "function") {
-    console.log("Versi whatsapp-web.js ini belum mendukung pairing code. Pakai QR.");
-    loginMethod = "qr";
+  console.log("Mencari sesi WhatsApp...");
+  if (sessionExists) {
+    console.log(`Sesi ditemukan: ${getAuthSessionPath()}`);
+  } else {
+    console.log("Sesi belum ada.");
+  }
+
+  const isInteractive = Boolean(input.isTTY && output.isTTY);
+  if (!isInteractive) {
+    if (sessionExists) {
+      console.log("Console non-interaktif, lanjut memakai sesi sekarang.");
+      return;
+    }
+
+    if (!setEnvLoginMethod()) {
+      loginMethod = "qr";
+      console.log("Mode login: QR Code (non-interactive environment)");
+      console.log(
+        "Tip: set LOGIN_METHOD=pairing dan PAIRING_PHONE=628xxxxxxxxxx untuk pairing tanpa prompt."
+      );
+    }
+
     return;
   }
 
-  pairingRequested = true;
+  while (true) {
+    const currentSessionExists = hasAuthSession();
+    const rl = readline.createInterface({ input, output });
+    let choice;
 
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      const code = await client.requestPairingCode(pairingPhone);
-      console.log(`Kode pairing untuk ${pairingPhone}: ${code}`);
-      console.log("Masukkan kode di WhatsApp > Perangkat tertaut > Tautkan dengan nomor.");
-      return;
-    } catch (error) {
-      console.error(
-        `Gagal generate pairing code (${attempt}/3):`,
-        error.message
-      );
-
-      if (attempt < 3) {
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+      console.log("");
+      console.log("=== Koneksi WhatsApp ===");
+      console.log("1. Login QR");
+      console.log("2. Login Pairing Kode");
+      console.log("3. Reset Sesi");
+      if (currentSessionExists) {
+        console.log("4. Lanjut Sesi Sekarang");
       }
-    }
-  }
 
-  console.log("Pairing code gagal. Lanjutkan login dengan QR cadangan di terminal.");
+      choice = (await rl.question("Pilih opsi: ")).trim();
+    } finally {
+      rl.close();
+    }
+
+    if (choice === "1") {
+      if (hasAuthSession()) {
+        await removeAuthSession();
+        console.log(`Sesi lama dihapus: ${getAuthSessionPath()}`);
+      }
+
+      loginMethod = "qr";
+      pairingPhone = null;
+      console.log("Mode login: QR Code");
+      return;
+    }
+
+    if (choice === "2") {
+      if (hasAuthSession()) {
+        await removeAuthSession();
+        console.log(`Sesi lama dihapus: ${getAuthSessionPath()}`);
+      }
+
+      await askPairingPhone();
+      return;
+    }
+
+    if (choice === "3") {
+      if (hasAuthSession()) {
+        await removeAuthSession();
+        console.log(`Sesi direset: ${getAuthSessionPath()}`);
+      } else {
+        console.log("Tidak ada sesi yang perlu direset.");
+      }
+      continue;
+    }
+
+    if (choice === "4" && hasAuthSession()) {
+      console.log("Lanjut memakai sesi WhatsApp sekarang.");
+      return;
+    }
+
+    console.log("Pilihan tidak valid.");
+  }
 }
 
-client.on("qr", (qr) => {
-  if (loginMethod === "pairing" && !qrShown) {
-    console.log("Mencoba pairing code. QR di bawah tetap bisa dipakai sebagai cadangan.");
-  }
+function getConnectedNumber() {
+  const wid = client?.info?.wid;
+  const rawNumber = wid?.user || wid?._serialized;
+  return normalizeNumber(rawNumber) || "-";
+}
 
-  if (loginMethod === "qr" || !qrShown) {
-    qrcode.generate(qr, { small: true });
-    console.log("Scan QR di atas untuk login bot WhatsApp MD.");
-    qrShown = true;
-  }
-});
+function registerClientEvents() {
+  client.on("code", (code) => {
+    console.log("");
+    console.log(`Kode pairing untuk ${pairingPhone}: ${code}`);
+    console.log("Buka WhatsApp > Perangkat tertaut > Tautkan dengan nomor telepon.");
+    console.log("Masukkan kode pairing di atas sebelum kedaluwarsa.");
+    console.log("");
+  });
 
-client.on("ready", () => {
-  console.log("Bot WhatsApp MD aktif.");
-});
+  client.on("qr", (qr) => {
+    if (loginMethod === "qr") {
+      qrcode.generate(qr, { small: true });
+      console.log("Scan QR di atas untuk login bot WhatsApp MD.");
+    }
+  });
 
-client.on("message", async (message) => {
+  client.on("ready", () => {
+    console.log("Bot WhatsApp MD aktif.");
+    console.log(`Nomor terkoneksi: ${getConnectedNumber()}`);
+  });
+
+  client.on("authenticated", () => {
+    console.log("Sesi WhatsApp berhasil diautentikasi.");
+  });
+
+  client.on("auth_failure", (message) => {
+    console.error("Autentikasi WhatsApp gagal:", message);
+  });
+
+  client.on("disconnected", (reason) => {
+    console.log("Bot WhatsApp terputus:", reason);
+  });
+
+  client.on("loading_screen", (percent, message) => {
+    console.log(`Loading WhatsApp ${percent}% - ${message}`);
+  });
+
+  client.on("message", async (message) => {
   try {
     if (message.fromMe) return;
 
@@ -372,16 +472,14 @@ client.on("message", async (message) => {
     } catch {
     }
   }
-});
+  });
+}
 
 async function startBot() {
-  await askLoginMethod();
+  await configureStartupSession();
+  client = createClient();
+  registerClientEvents();
   await client.initialize();
-
-  if (loginMethod === "pairing") {
-    await new Promise((resolve) => setTimeout(resolve, 4000));
-    await requestPairingCodeWithRetry();
-  }
 }
 
 startBot().catch((error) => {
@@ -396,7 +494,9 @@ async function shutdown(signal) {
 
   try {
     console.log(`Terima signal ${signal}. Menutup bot...`);
-    await client.destroy();
+    if (client) {
+      await client.destroy();
+    }
   } catch (error) {
     console.error("Gagal menutup bot dengan rapi:", error.message);
   } finally {

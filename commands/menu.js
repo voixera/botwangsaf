@@ -1,7 +1,11 @@
+const fs = require("fs");
+const path = require("path");
+const { MessageMedia } = require("whatsapp-web.js");
+
 module.exports = {
   name: "menu",
   aliases: ["help"],
-  description: "Menampilkan daftar command bot.",
+  description: "Menampilkan daftar command DX Bot.",
   usage: "menu",
   async execute({ message, commands, state }) {
     const prefix = state.config.prefixes[0];
@@ -10,10 +14,19 @@ module.exports = {
     );
 
     const commandCategories = {
-      "🟫 Media": ["stiker", "brat"],
-      "🍫 Tanya": ["tanya", "endtanya"],
-      "🤎 Menfess": ["menfess", "endconfess"],
-      "🟤 Curhat": ["curhat", "endcurhat"],
+      "◈ 𝙼𝙴𝙳𝙸𝙰": ["stiker", "brat"],
+      "◈ 𝙰𝙸": ["tanya", "endtanya", "curhat", "endcurhat"],
+      "◈ 𝙼𝙴𝙽𝙵𝙴𝚂𝚂": ["menfess", "endconfess"],
+      "◈ 𝚄𝚃𝙸𝙻𝙸𝚃𝚈": [
+        "ping",
+        "runtime",
+        "info",
+        "id",
+        "owner",
+        "prefix",
+        "quote",
+        "grupinfo",
+      ],
     };
 
     const categoryNames = Object.keys(commandCategories);
@@ -26,53 +39,48 @@ module.exports = {
       (cmd) => !commandNamesInCategory.includes(cmd.name)
     );
 
-    const divider = "━━━━━━━━━━━━━━━━━━";
-
-    const formatCommand = (cmd) => {
-      const usage = cmd.usage ? `${prefix}${cmd.usage}` : `${prefix}${cmd.name}`;
-      const alias = cmd.aliases?.length ? `\n  alias: ${cmd.aliases.join(", ")}` : "";
-      return `• ${usage}\n  ${cmd.description || "-"}${alias}`;
-    };
+    const line = "━━━━━━━━━━━━━━━━━━━━";
+    const thinLine = "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄";
+    const formatCommand = (cmd) => `┃ ⌬ ${prefix}${cmd.name}`;
 
     const formatCategory = (category) => {
       const names = commandCategories[category];
       const filtered = categorizedCommands.filter((cmd) => names.includes(cmd.name));
       if (!filtered.length) return "";
-      return [category, filtered.map(formatCommand).join("\n")].join("\n");
+
+      return [`╭─ ${category}`, filtered.map(formatCommand).join("\n")].join("\n");
     };
 
     const categoryList = categoryNames
       .map((category) => formatCategory(category))
       .filter(Boolean)
-      .join("\n\n");
+      .join(`\n${thinLine}\n`);
 
-    const otherList = otherCommands.length ? otherCommands.map(formatCommand).join("\n") : "";
+    const otherList = otherCommands.length
+      ? ["╭─ ◈ 𝙻𝙰𝙸𝙽𝙽𝚈𝙰", otherCommands.map(formatCommand).join("\n")].join("\n")
+      : "";
 
-    await message.reply(
-      [
-        "🍫 *CHOCO BOT MENU*",
-        divider,
-        categoryList,
-        otherList ? `\n🤍 Lainnya\n${otherList}` : "",
-        "",
-        divider,
-        "🍪 *Contoh Penggunaan*",
-        "",
-        "🤎 Menfess",
-        `Kirim: ${prefix}menfess 628xxx|Nama Target|pesan kamu`,
-        `Stop : ${prefix}endconfess`,
-        "",
-        "🟤 Curhat",
-        `Mulai: ${prefix}curhat` + "<topik>",
-        `Stop : ${prefix}endcurhat`,
-        "",
-        "🍫 Tanya",
-        `Mulai: ${prefix}tanya`,
-        "Tanya: kirim pesan apa saja setelah mode aktif",
-        `Stop : ${prefix}endtanya`,
-        "",
-        divider,
-      ].join("\n")
-    );
+    const menuText = [
+      "╭━━〔 *𝙳𝚇 𝙱𝙾𝚃* 〕━━╮",
+      "┃ 𝙼𝙰𝙸𝙽 𝙼𝙴𝙽𝚄",
+      "╰━━━━━━━━━━━━━━━━╯",
+      "",
+      line,
+      categoryList,
+      otherList ? `${thinLine}\n${otherList}` : "",
+      line,
+      "",
+      `Prefix aktif: *${state.config.prefixes.join(" ")}*`,
+      line,
+    ].join("\n");
+
+    const imagePath = path.join(__dirname, "..", "assets", "chat.jpeg");
+    if (fs.existsSync(imagePath)) {
+      const media = MessageMedia.fromFilePath(imagePath);
+      await message.reply(media, undefined, { caption: menuText });
+      return;
+    }
+
+    await message.reply(menuText);
   },
 };

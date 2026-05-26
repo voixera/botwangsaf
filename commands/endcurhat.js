@@ -1,3 +1,5 @@
+const { success, warn } = require("./_style");
+
 module.exports = {
   name: "endcurhat",
   aliases: ["stopcurhat"],
@@ -5,16 +7,16 @@ module.exports = {
   usage: "endcurhat",
   async execute({ message, state, helpers }) {
     if (!helpers.isPrivateUserChat(message)) {
-      await message.reply("Command ini hanya bisa dipakai di chat private bot.");
+      await message.reply(warn("Command ini hanya bisa dipakai di chat private bot."));
       return;
     }
 
     if (!state.activeCurhat.has(message.from)) {
-      await message.reply("Mode curhat sedang tidak aktif.");
+      await message.reply(warn("Mode curhat sedang tidak aktif."));
       return;
     }
 
     state.activeCurhat.delete(message.from);
-    await message.reply("Mode curhat telah dimatikan. Kalau ada apa-apa lagi, jangan sungkan buat ketik `.curhat` lagi ya. Nara selalu siap dengerin kok. Semangat terus!");
+    await message.reply(success("𝙲𝚄𝚁𝙷𝙰𝚃", "Mode curhat telah dimatikan."));
   },
 };
