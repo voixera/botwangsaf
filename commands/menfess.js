@@ -296,14 +296,14 @@ module.exports = {
     const hasMedia = message.hasMedia;
 
     if (!replyText && !hasMedia) {
-      await message.reply("Pesan kosong tidak bisa diteruskan.");
+      await message.reply("Mohon isi Pesan dahulu, Pesan yang kosong tidak bisa diteruskan.");
       return true;
     }
 
     if (hasMedia) {
       const media = await message.downloadMedia();
       if (!media) {
-        await message.reply("Media gagal dibaca. Coba kirim ulang.");
+        await message.reply("Media yang dikirim gagal dibaca. Coba kirim ulang.");
         return true;
       }
 

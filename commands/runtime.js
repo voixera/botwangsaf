@@ -19,7 +19,7 @@ function formatUptime(totalSeconds) {
 module.exports = {
   name: "runtime",
   aliases: ["uptime"],
-  description: "Cek lama bot aktif.",
+  description: "Cek Seberapa lama bot ini telah aktif.",
   usage: "runtime",
   async execute({ message }) {
     await message.reply(
