@@ -1,4 +1,5 @@
 const fs = require("fs");
+const http = require("http");
 const path = require("path");
 const readline = require("readline/promises");
 const { stdin: input, stdout: output } = require("process");
@@ -69,8 +70,10 @@ const PAIRING_SHOW_NOTIFICATION =
     String(process.env.PAIRING_SHOW_NOTIFICATION || "").toLowerCase()
   );
 const PAIRING_INTERVAL_MS = Number(process.env.PAIRING_INTERVAL_MS) || 180000;
+const DEFAULT_WWEBJS_DATA_PATH =
+  process.env.RAILWAY_VOLUME_MOUNT_PATH || path.join(__dirname, ".wwebjs_auth");
 const WWEBJS_DATA_PATH =
-  process.env.WWEBJS_DATA_PATH || path.join(__dirname, ".wwebjs_auth");
+  process.env.WWEBJS_DATA_PATH || DEFAULT_WWEBJS_DATA_PATH;
 const WWEBJS_CLIENT_ID = process.env.WWEBJS_CLIENT_ID || undefined;
 const PUPPETEER_EXECUTABLE_PATH =
   process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || undefined;
@@ -89,6 +92,55 @@ const state = {
 let loginMethod = "qr";
 let pairingPhone = null;
 let client = null;
+let healthServer = null;
+
+const runtimeStatus = {
+  whatsapp: "starting",
+  lastError: null,
+};
+
+function startHealthServer() {
+  const rawPort = process.env.PORT;
+  if (!rawPort) return null;
+
+  const port = Number(rawPort);
+  if (!Number.isInteger(port) || port <= 0) {
+    console.warn(`PORT tidak valid untuk health server: ${rawPort}`);
+    return null;
+  }
+
+  const server = http.createServer((request, response) => {
+    if (request.url === "/" || request.url === "/health") {
+      const payload = JSON.stringify({
+        status: "ok",
+        whatsapp: runtimeStatus.whatsapp,
+        lastError: runtimeStatus.lastError,
+        uptimeSeconds: Math.floor(process.uptime()),
+      });
+
+      response.writeHead(200, {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(payload),
+      });
+      response.end(payload);
+      return;
+    }
+
+    response.writeHead(404, { "Content-Type": "text/plain" });
+    response.end("Not found");
+  });
+
+  server.on("error", (error) => {
+    console.error("Health server gagal:", error.message);
+    process.exit(1);
+  });
+
+  server.listen(port, "0.0.0.0", () => {
+    console.log(`Health server aktif di port ${port}.`);
+  });
+
+  return server;
+}
 
 function normalizeNumber(rawNumber) {
   const digits = String(rawNumber || "").replace(/\D/g, "");
@@ -171,6 +223,8 @@ function loadCommands() {
 const commands = loadCommands();
 
 function createClient() {
+  fs.mkdirSync(WWEBJS_DATA_PATH, { recursive: true });
+
   const options = {
     authStrategy: new LocalAuth({
       dataPath: WWEBJS_DATA_PATH,
@@ -358,6 +412,8 @@ function getConnectedNumber() {
 
 function registerClientEvents() {
   client.on("code", (code) => {
+    runtimeStatus.whatsapp = "waiting_for_pairing_code";
+    runtimeStatus.lastError = null;
     console.log("");
     console.log(`Kode pairing untuk ${pairingPhone}: ${code}`);
     console.log("Buka WhatsApp > Perangkat tertaut > Tautkan dengan nomor telepon.");
@@ -367,29 +423,40 @@ function registerClientEvents() {
 
   client.on("qr", (qr) => {
     if (loginMethod === "qr") {
+      runtimeStatus.whatsapp = "waiting_for_qr";
+      runtimeStatus.lastError = null;
       qrcode.generate(qr, { small: true });
       console.log("Scan QR di atas untuk login bot WhatsApp MD.");
     }
   });
 
   client.on("ready", () => {
+    runtimeStatus.whatsapp = "ready";
+    runtimeStatus.lastError = null;
     console.log("Bot WhatsApp MD aktif.");
     console.log(`Nomor terkoneksi: ${getConnectedNumber()}`);
   });
 
   client.on("authenticated", () => {
+    runtimeStatus.whatsapp = "authenticated";
+    runtimeStatus.lastError = null;
     console.log("Sesi WhatsApp berhasil diautentikasi.");
   });
 
   client.on("auth_failure", (message) => {
+    runtimeStatus.whatsapp = "auth_failure";
+    runtimeStatus.lastError = String(message || "Autentikasi gagal");
     console.error("Autentikasi WhatsApp gagal:", message);
   });
 
   client.on("disconnected", (reason) => {
+    runtimeStatus.whatsapp = "disconnected";
+    runtimeStatus.lastError = String(reason || "Terputus");
     console.log("Bot WhatsApp terputus:", reason);
   });
 
   client.on("loading_screen", (percent, message) => {
+    runtimeStatus.whatsapp = "loading";
     console.log(`Loading WhatsApp ${percent}% - ${message}`);
   });
 
@@ -482,7 +549,11 @@ async function startBot() {
   await client.initialize();
 }
 
+healthServer = startHealthServer();
+
 startBot().catch((error) => {
+  runtimeStatus.whatsapp = "failed";
+  runtimeStatus.lastError = error.message;
   console.error("Gagal start bot:", error.message);
   process.exit(1);
 });
@@ -496,6 +567,10 @@ async function shutdown(signal) {
     console.log(`Terima signal ${signal}. Menutup bot...`);
     if (client) {
       await client.destroy();
+    }
+
+    if (healthServer) {
+      await new Promise((resolve) => healthServer.close(resolve));
     }
   } catch (error) {
     console.error("Gagal menutup bot dengan rapi:", error.message);

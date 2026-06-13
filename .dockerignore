@@ -1,0 +1,8 @@
+.env
+.git
+.npm-cache
+.wwebjs_auth
+.wwebjs_cache
+gcm-diagnose.log
+node_modules
+npm-debug.log
