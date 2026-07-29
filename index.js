@@ -194,10 +194,10 @@ async function start(selectedMode) {
         console.log(`Kode pairing: ${code}`);
         console.log("Masukkan di WhatsApp > Perangkat tertaut > Tautkan dengan nomor telepon.");
       } catch (error) { console.error(`Gagal meminta kode pairing: ${error.message}`); }
-    }, 1500);
+    }, 5000);
   }
   sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
-    if (qr) { qrcode.generate(qr, { small: true }); console.log("Scan QR di atas untuk login bot WhatsApp MD."); }
+    if (qr && mode === "qr") { qrcode.generate(qr, { small: true }); console.log("Scan QR di atas untuk login bot WhatsApp MD."); }
     if (connection === "open") {
       console.log(`Bot Baileys aktif. Nomor: ${jidDecode(sock.user?.id)?.user || sock.user?.id || "-"}`);
       console.log(`Sesi tersimpan di: ${AUTH_PATH}`);
