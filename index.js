@@ -1,4 +1,5 @@
 const fs = require("fs");
+const http = require("http");
 const path = require("path");
 const readline = require("readline");
 const qrcode = require("qrcode-terminal");
@@ -24,6 +25,21 @@ const state = {
   },
 };
 const messages = new Map();
+
+function startHealthServer() {
+  const port = Number(process.env.PORT);
+  if (!Number.isInteger(port) || port <= 0) return;
+  const server = http.createServer((request, response) => {
+    if (request.url === "/" || request.url === "/health") {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ status: "ok", uptime: Math.floor(process.uptime()) }));
+      return;
+    }
+    response.writeHead(404);
+    response.end("Not found");
+  });
+  server.listen(port, "0.0.0.0", () => console.log(`Health server aktif di port ${port}.`));
+}
 
 function normalizeNumber(value) {
   const digits = String(value || "").replace(/\D/g, "");
@@ -225,6 +241,7 @@ async function chooseLoginMode() {
   if (choice === "4" && hasSession) return "continue";
   return "qr";
 }
+startHealthServer();
 start().catch((error) => { console.error("Gagal start bot:", error); process.exit(1); });
 
 let closing = false;
