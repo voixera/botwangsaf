@@ -224,8 +224,9 @@ async function chooseLoginMode() {
   const configured = String(process.env.LOGIN_METHOD || "").toLowerCase();
   const hasSession = fs.existsSync(AUTH_PATH) && fs.readdirSync(AUTH_PATH).length > 0;
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    if (configured === "pairing") return "pairing";
     if (hasSession) return "continue";
-    return configured === "pairing" ? "pairing" : "qr";
+    return "qr";
   }
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const ask = (question) => new Promise((resolve) => rl.question(question, resolve));
