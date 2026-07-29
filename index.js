@@ -137,8 +137,8 @@ async function handleMessage(sock, raw) {
     }
   } catch (error) { console.error("Error command:", error); await message.reply("Terjadi error saat memproses pesan."); }
 }
-async function start() {
-  const mode = await chooseLoginMode();
+async function start(selectedMode) {
+  const mode = selectedMode || await chooseLoginMode();
   if (mode === "reset") {
     resetAuthSession();
     console.log("Sesi dihapus. Jalankan ulang bot untuk login kembali.");
@@ -176,7 +176,11 @@ async function start() {
     }
     if (connection === "close") {
       const code = lastDisconnect?.error?.output?.statusCode;
-      if (code !== DisconnectReason.loggedOut) { console.log("Koneksi terputus, menyambungkan ulang..."); setTimeout(start, 2000); }
+      const reason = lastDisconnect?.error?.message || "alasan tidak diketahui";
+      if (code !== DisconnectReason.loggedOut) {
+        console.log(`Koneksi terputus (kode ${code || "-"}: ${reason}), menyambungkan ulang dengan mode ${mode}...`);
+        setTimeout(() => start(mode), 2000);
+      }
       else console.error("Sesi logout. Hapus .baileys_auth lalu jalankan ulang.");
     }
   });
