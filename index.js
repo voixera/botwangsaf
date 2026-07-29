@@ -5,6 +5,8 @@ const qrcode = require("qrcode-terminal");
 const P = require("pino");
 const {
   default: makeWASocket,
+  Browsers,
+  fetchLatestBaileysVersion,
   useMultiFileAuthState,
   DisconnectReason,
   downloadContentFromMessage,
@@ -146,12 +148,22 @@ async function start(selectedMode) {
   }
   fs.mkdirSync(AUTH_PATH, { recursive: true });
   const { state: auth, saveCreds } = await useMultiFileAuthState(AUTH_PATH);
+  let version;
+  try {
+    const latest = await Promise.race([
+      fetchLatestBaileysVersion(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000)),
+    ]);
+    version = latest.version;
+    console.log(`Versi WhatsApp Web: ${version.join(".")}`);
+  } catch { console.log("Versi WhatsApp Web terbaru tidak tersedia, memakai versi bawaan Baileys."); }
   let sock;
   sock = makeWASocket({
     auth,
     logger: P({ level: "silent" }),
     printQRInTerminal: false,
-    browser: ["WAResource", "Chrome", "1.0.0"],
+    ...(version ? { version } : {}),
+    browser: Browsers.windows("WAResource"),
     markOnlineOnConnect: false,
     syncFullHistory: false,
     generateHighQualityLinkPreview: false,
