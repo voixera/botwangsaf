@@ -11,6 +11,7 @@ RUN apt-get update \
       ca-certificates \
       chromium \
       dumb-init \
+      ffmpeg \
       fonts-liberation \
       libasound2 \
       libatk-bridge2.0-0 \
