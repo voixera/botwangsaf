@@ -15,7 +15,13 @@ const {
 } = require("@whiskeysockets/baileys");
 
 const PREFIXES = [".", "/", "!"];
-const AUTH_PATH = process.env.WA_AUTH_PATH || path.join(__dirname, ".baileys_auth");
+// Keep local and Railway credentials completely separate.  A Railway volume can
+// be mounted at /data; locally the credentials stay in the project directory.
+const runtime = process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV || "local";
+const defaultAuthPath = runtime === "local"
+  ? path.join(__dirname, ".baileys_auth-local")
+  : path.join(process.env.WA_DATA_DIR || "/data", ".baileys_auth-server");
+const AUTH_PATH = process.env.WA_AUTH_PATH || defaultAuthPath;
 const state = {
   activeCurhat: new Map(), activeMenfess: new Map(), activeTanya: new Map(),
   lastMedia: new Map(), config: {
@@ -185,18 +191,23 @@ async function start(selectedMode) {
     generateHighQualityLinkPreview: false,
   });
   sock.ev.on("creds.update", saveCreds);
-  if (mode === "pairing" && !auth.creds.registered) {
+  let pairingRequested = false;
+  const requestPairingCode = async () => {
+    if (pairingRequested || auth.creds.registered || mode !== "pairing") return;
     const phone = normalizeNumber(process.env.PAIRING_PHONE || "");
     if (!phone) throw new Error("Nomor pairing belum diisi. Set PAIRING_PHONE, contoh: 628xxxxxxxxxx");
-    setTimeout(async () => {
-      try {
-        const code = await sock.requestPairingCode(phone);
-        console.log(`Kode pairing: ${code}`);
-        console.log("Masukkan di WhatsApp > Perangkat tertaut > Tautkan dengan nomor telepon.");
-      } catch (error) { console.error(`Gagal meminta kode pairing: ${error.message}`); }
-    }, 5000);
-  }
+    pairingRequested = true;
+    try {
+      const code = await sock.requestPairingCode(phone);
+      console.log(`\nKode pairing: ${code}`);
+      console.log("Buka WhatsApp > Perangkat tertaut > Tautkan perangkat > Tautkan dengan nomor telepon, lalu masukkan kode ini.\n");
+    } catch (error) {
+      pairingRequested = false;
+      console.error(`Gagal meminta kode pairing: ${error.message}`);
+    }
+  };
   sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
+    if (connection === "connecting" && mode === "pairing") setTimeout(requestPairingCode, 3000);
     if (qr && mode === "qr") { qrcode.generate(qr, { small: true }); console.log("Scan QR di atas untuk login bot WhatsApp MD."); }
     if (connection === "open") {
       console.log(`Bot Baileys aktif. Nomor: ${jidDecode(sock.user?.id)?.user || sock.user?.id || "-"}`);
@@ -221,7 +232,9 @@ function resetAuthSession() {
 }
 
 async function chooseLoginMode() {
-  const configured = String(process.env.LOGIN_METHOD || "").toLowerCase();
+  // Pairing is the zero-interaction login flow. Set LOGIN_METHOD=qr only when
+  // a QR login is explicitly preferred.
+  const configured = String(process.env.LOGIN_METHOD || "pairing").toLowerCase();
   const hasSession = fs.existsSync(AUTH_PATH) && fs.readdirSync(AUTH_PATH).length > 0;
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     if (configured === "pairing") return "pairing";

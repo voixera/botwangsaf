@@ -2,5 +2,8 @@
 node_modules/
 .npm-cache/
 .wwebjs_auth/
+.baileys_auth-local/
+.baileys_auth-server/
+.baileys_auth/
 .wwebjs_cache/
 gcm-diagnose.log
