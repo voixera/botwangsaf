@@ -25,6 +25,6 @@ npm start
 
 Local memakai `.baileys_auth-local`, sedangkan Railway memakai `/data/.baileys_auth-server` (pasang Railway Volume ke `/data`). Session jangan disalin silang.
 
-- QR: `LOGIN_METHOD=qr`, jalankan `npm start`, lalu scan QR di terminal/log.
+- QR: `LOGIN_METHOD=qr`, jalankan `npm start`, lalu buka link `Buka link ini untuk scan QR WhatsApp` di log. Link bersifat sementara dan memiliki token acak setiap bot mulai.
 - Pairing: `LOGIN_METHOD=pairing` dan isi `PAIRING_PHONE=628xxxxxxxxxx`; masukkan kode yang muncul ke WhatsApp > Perangkat tertaut > Tautkan dengan nomor telepon.
 - Setelah berhasil, session tersimpan otomatis dan bot akan reconnect tanpa scan ulang.

@@ -2,6 +2,7 @@ const fs = require("fs");
 const http = require("http");
 const path = require("path");
 const readline = require("readline");
+const crypto = require("crypto");
 const qrcode = require("qrcode-terminal");
 const P = require("pino");
 const {
@@ -31,12 +32,51 @@ const state = {
   },
 };
 const messages = new Map();
+let latestQr = null;
+const qrViewToken = crypto.randomBytes(24).toString("hex");
+
+function publicBaseUrl(port) {
+  if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, "");
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+  return `http://localhost:${port}`;
+}
+
+function htmlEscape(value) {
+  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function qrAsText(qr) {
+  let terminalQr = "";
+  qrcode.generate(qr, { small: false }, (value) => { terminalQr = value; });
+  // qrcode-terminal uses terminal background colours. Convert those to solid
+  // blocks so the exact QR matrix is preserved in a browser <pre> element.
+  return terminalQr
+    .replace(/\x1b\[40m  \x1b\[0m/g, "██")
+    .replace(/\x1b\[47m  \x1b\[0m/g, "  ")
+    .replace(/\x1b\[[0-9;]*m/g, "");
+}
 
 function startHealthServer() {
   const port = Number(process.env.PORT);
   if (!Number.isInteger(port) || port <= 0) return;
   const server = http.createServer((request, response) => {
-    if (request.url === "/" || request.url === "/health") {
+    const url = new URL(request.url, `http://${request.headers.host || "localhost"}`);
+    if (url.pathname === "/pairing-qr") {
+      if (url.searchParams.get("token") !== qrViewToken) {
+        response.writeHead(403, { "Content-Type": "text/plain" });
+        response.end("QR link tidak valid.");
+        return;
+      }
+      if (!latestQr) {
+        response.writeHead(503, { "Content-Type": "text/plain", "Retry-After": "3" });
+        response.end("QR belum siap. Muat ulang halaman dalam beberapa detik.");
+        return;
+      }
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      response.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>WhatsApp QR</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111;color:#fff;font-family:system-ui}main{text-align:center;padding:20px}pre{display:inline-block;margin:16px 0;background:#fff;color:#000;padding:16px;font:8px/8px monospace;letter-spacing:0;white-space:pre}p{max-width:360px;margin:auto}</style></head><body><main><h1>Scan QR WhatsApp</h1><pre>${htmlEscape(qrAsText(latestQr))}</pre><p>Scan dengan WhatsApp &rarr; Perangkat tertaut. Halaman ini otomatis tidak berlaku setelah QR diganti atau bot berhasil terhubung.</p></main></body></html>`);
+      return;
+    }
+    if (url.pathname === "/" || url.pathname === "/health") {
       response.writeHead(200, { "Content-Type": "application/json" });
       response.end(JSON.stringify({ status: "ok", uptime: Math.floor(process.uptime()) }));
       return;
@@ -213,8 +253,17 @@ async function start(selectedMode) {
     // Baileys emits `qr` only after the registration handshake is ready. A
     // pairing code requested earlier can be displayed but rejected by WhatsApp.
     if (qr && mode === "pairing") void requestPairingCode();
-    if (qr && mode === "qr") { qrcode.generate(qr, { small: true }); console.log("Scan QR di atas untuk login bot WhatsApp MD."); }
+    if (qr && mode === "qr") {
+      latestQr = qr;
+      const port = Number(process.env.PORT) || 3000;
+      const qrUrl = `${publicBaseUrl(port)}/pairing-qr?token=${qrViewToken}`;
+      console.log(`Buka link ini untuk scan QR WhatsApp: ${qrUrl}`);
+      if (!process.env.PUBLIC_URL && !process.env.RAILWAY_PUBLIC_DOMAIN && runtime !== "local") {
+        console.warn("Set PUBLIC_URL ke domain Railway agar link QR dapat dibuka dari browser.");
+      }
+    }
     if (connection === "open") {
+      latestQr = null;
       console.log(`Bot Baileys aktif. Nomor: ${jidDecode(sock.user?.id)?.user || sock.user?.id || "-"}`);
       console.log(`Sesi tersimpan di: ${AUTH_PATH}`);
     }
@@ -239,7 +288,7 @@ function resetAuthSession() {
 async function chooseLoginMode() {
   // Pairing is the zero-interaction login flow. Set LOGIN_METHOD=qr only when
   // a QR login is explicitly preferred.
-  const configured = String(process.env.LOGIN_METHOD || "pairing").toLowerCase();
+  const configured = String(process.env.LOGIN_METHOD || "qr").toLowerCase();
   const hasSession = fs.existsSync(AUTH_PATH) && fs.readdirSync(AUTH_PATH).length > 0;
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     if (configured === "pairing") return "pairing";
