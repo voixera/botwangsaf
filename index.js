@@ -189,6 +189,9 @@ async function start(selectedMode) {
     markOnlineOnConnect: false,
     syncFullHistory: false,
     generateHighQualityLinkPreview: false,
+    // Pairing may take longer on a cloud host. Do not abort the request while
+    // WhatsApp is waiting for the code entered on the phone.
+    defaultQueryTimeoutMs: undefined,
   });
   sock.ev.on("creds.update", saveCreds);
   let pairingRequested = false;
@@ -207,7 +210,9 @@ async function start(selectedMode) {
     }
   };
   sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
-    if (connection === "connecting" && mode === "pairing") setTimeout(requestPairingCode, 3000);
+    // Baileys emits `qr` only after the registration handshake is ready. A
+    // pairing code requested earlier can be displayed but rejected by WhatsApp.
+    if (qr && mode === "pairing") void requestPairingCode();
     if (qr && mode === "qr") { qrcode.generate(qr, { small: true }); console.log("Scan QR di atas untuk login bot WhatsApp MD."); }
     if (connection === "open") {
       console.log(`Bot Baileys aktif. Nomor: ${jidDecode(sock.user?.id)?.user || sock.user?.id || "-"}`);
