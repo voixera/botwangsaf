@@ -161,11 +161,7 @@ module.exports = {
     const svg = buildSvg(bratText);
     const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 768 } });
     const pngBuffer = resvg.render().asPng();
-    // Baileys mengirim properti `sticker` apa adanya. PNG yang dipaksakan
-    // menjadi sticker masih bisa muncul pada sebagian Android, namun bukan
-    // sticker WhatsApp yang valid untuk disimpan di iOS. Buat WebP dan tulis
-    // metadata EXIF lewat formatter agar kedua platform mengenalinya sebagai
-    // sticker normal.
+    
     const stickerBuffer = await new Sticker(pngBuffer, {
       pack: state.config.stickerPackname,
       author: state.config.stickerAuthor,
