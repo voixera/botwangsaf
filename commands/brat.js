@@ -1,5 +1,5 @@
 const { Resvg } = require("@resvg/resvg-js");
-const { MessageMedia } = require("whatsapp-web.js");
+const { Sticker, StickerTypes } = require("wa-sticker-formatter");
 
 function escapeXml(value) {
   return value
@@ -20,7 +20,9 @@ function splitLongWord(word, maxLength) {
 
 function getWords(text) {
   return text
-    .toLowerCase()
+    // Gaya contoh memakai huruf kapital. Mengubahnya di sini juga membuat
+    // hasil tetap rapi walaupun pengguna memasukkan teks huruf kecil.
+    .toUpperCase()
     .split(/\s+/)
     .filter(Boolean)
     .flatMap((word) => (word.length > 13 ? splitLongWord(word, 13) : word));
@@ -159,16 +161,26 @@ module.exports = {
     const svg = buildSvg(bratText);
     const resvg = new Resvg(svg, { fitTo: { mode: "width", value: 768 } });
     const pngBuffer = resvg.render().asPng();
-    const media = new MessageMedia(
-      "image/png",
-      pngBuffer.toString("base64"),
-      "brat.png"
-    );
+    // Baileys mengirim properti `sticker` apa adanya. PNG yang dipaksakan
+    // menjadi sticker masih bisa muncul pada sebagian Android, namun bukan
+    // sticker WhatsApp yang valid untuk disimpan di iOS. Buat WebP dan tulis
+    // metadata EXIF lewat formatter agar kedua platform mengenalinya sebagai
+    // sticker normal.
+    const stickerBuffer = await new Sticker(pngBuffer, {
+      pack: state.config.stickerPackname,
+      author: state.config.stickerAuthor,
+      type: StickerTypes.FULL,
+      categories: ["✨"],
+      background: "#FFFFFFFF",
+    }).toBuffer();
+    const media = {
+      mimetype: "image/webp",
+      data: stickerBuffer.toString("base64"),
+      filename: "brat.webp",
+    };
 
     await message.reply(media, undefined, {
       sendMediaAsSticker: true,
-      stickerName: state.config.stickerPackname,
-      stickerAuthor: state.config.stickerAuthor,
     });
   },
 };
