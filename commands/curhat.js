@@ -1,8 +1,8 @@
 const PERSONA_NAME = process.env.CURHAT_PERSONA_NAME || "Nara";
-const GROK_API_URL =
-  process.env.GROK_API_URL || "https://api.x.ai/v1/chat/completions";
-const GROK_MODEL = process.env.GROK_MODEL || "grok-3.3";
-const GROK_API_KEY = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
+const GROQ_API_URL =
+  process.env.GROQ_API_URL || "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const MAX_HISTORY_MESSAGES = 12;
 
 const NARA_SYSTEM_PROMPT = [
@@ -52,8 +52,8 @@ function extractAiText(payload) {
   return null;
 }
 
-async function askGrok(userId, input) {
-  if (!GROK_API_KEY) {
+async function askGroq(userId, input) {
+  if (!GROQ_API_KEY) {
     return null;
   }
 
@@ -62,14 +62,14 @@ async function askGrok(userId, input) {
   const timeout = setTimeout(() => controller.abort(), 30000);
 
   try {
-    const response = await fetch(GROK_API_URL, {
+    const response = await fetch(GROQ_API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${GROK_API_KEY}`,
+        Authorization: `Bearer ${GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: GROK_MODEL,
+        model: GROQ_MODEL,
         temperature: 0.7,
         stream: false,
         messages: [
@@ -89,7 +89,7 @@ async function askGrok(userId, input) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Grok API error ${response.status}: ${errorText}`);
+      throw new Error(`Groq API error ${response.status}: ${errorText}`);
     }
 
     const data = await response.json();
@@ -124,21 +124,21 @@ function buildOfflineReply(input) {
   }
 
   return [
-    `${PERSONA_NAME} dengerin. Ceritamu sudah masuk, tapi mode AI Grok belum aktif karena \`GROK_API_KEY\` atau \`XAI_API_KEY\` belum diatur.`,
+    `${PERSONA_NAME} dengerin. Ceritamu sudah masuk, tapi mode AI Groq belum aktif karena \`GROQ_API_KEY\` belum diatur.`,
     "Sambil itu, coba lanjut ceritain: kejadian apa yang paling bikin kamu kepikiran sekarang?",
   ].join("\n\n");
 }
 
 async function buildReply(userId, input) {
   try {
-    const aiReply = await askGrok(userId, input);
+    const aiReply = await askGroq(userId, input);
     if (aiReply) {
       remember(userId, "user", input);
       remember(userId, "assistant", aiReply);
       return aiReply;
     }
   } catch (error) {
-    console.error("Grok curhat error:", error.message);
+    console.error("Groq curhat error:", error.message);
   }
 
   const fallback = buildOfflineReply(input);
