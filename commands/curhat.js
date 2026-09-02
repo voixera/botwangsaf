@@ -1,8 +1,8 @@
 const PERSONA_NAME = process.env.CURHAT_PERSONA_NAME || "Nara";
 const GROQ_API_URL =
   process.env.GROQ_API_URL || "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_MODEL = process.env.GROQ_MODEL || process.env.groq_model || "mixtral-8x7b-32768";
+const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.groq_api_key;
 const MAX_HISTORY_MESSAGES = 12;
 
 const NARA_SYSTEM_PROMPT = [
