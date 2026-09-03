@@ -1,7 +1,7 @@
 const QUESTION_HINTS =
   /\b(siapa|apa|kapan|di mana|dimana|kenapa|gimana|bagaimana|berapa|jelaskan|jelasin|beda|vs|versus|cara|how to|hitung|jam berapa|tanggal)\b/i;
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.1-8b-instant";
+const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const AI_SYSTEM_PROMPT = [
   "Kamu adalah asisten AI yang menjawab dalam bahasa Indonesia yang natural, ringkas, dan akurat.",
