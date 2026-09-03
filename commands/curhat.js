@@ -1,7 +1,7 @@
 const PERSONA_NAME = process.env.CURHAT_PERSONA_NAME || "Nara";
 const GROQ_API_URL =
   process.env.GROQ_API_URL || "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = process.env.GROQ_MODEL || process.env.groq_model || "llama-3.3-70b-versatile";
+const GROQ_MODEL = process.env.GROQ_MODEL || process.env.groq_model || "llama-3.1-8b-instant";
 const GROQ_API_KEY = process.env.GROQ_API_KEY || process.env.groq_api_key;
 const MAX_HISTORY_MESSAGES = 12;
 
@@ -52,6 +52,31 @@ function extractAiText(payload) {
   return null;
 }
 
+async function fetchPollinations(prompt, systemPrompt) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch("https://text.pollinations.ai/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt },
+        ],
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const text = await res.text();
+    return text.trim() || null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function askGroq(userId, input) {
   if (!GROQ_API_KEY) {
     return null;
@@ -61,42 +86,62 @@ async function askGroq(userId, input) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
 
-  try {
-    const response = await fetch(GROQ_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        temperature: 0.7,
-        stream: false,
-        messages: [
-          {
-            role: "system",
-            content: NARA_SYSTEM_PROMPT,
-          },
-          ...history,
-          {
-            role: "user",
-            content: input,
-          },
-        ],
-      }),
-      signal: controller.signal,
-    });
+  const modelsToTry = Array.from(
+    new Set([
+      GROQ_MODEL,
+      "llama-3.3-70b-versatile",
+      "llama3-8b-8192",
+      "llama3-70b-8192",
+      "mixtral-8x7b-32768",
+      "gemma2-9b-it",
+    ])
+  );
 
-    if (!response.ok) {
+  let lastError = null;
+  for (const modelName of modelsToTry) {
+    try {
+      const response = await fetch(GROQ_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: modelName,
+          temperature: 0.7,
+          stream: false,
+          messages: [
+            {
+              role: "system",
+              content: NARA_SYSTEM_PROMPT,
+            },
+            ...history,
+            {
+              role: "user",
+              content: input,
+            },
+          ],
+        }),
+        signal: controller.signal,
+      });
+
+      if (response.ok) {
+        clearTimeout(timeout);
+        const data = await response.json();
+        return extractAiText(data);
+      }
+
       const errorText = await response.text();
-      throw new Error(`Groq API error ${response.status}: ${errorText}`);
+      lastError = new Error(`Groq API error (${modelName}) ${response.status}: ${errorText}`);
+    } catch (err) {
+      lastError = err;
+      if (err.name === "AbortError") break;
     }
-
-    const data = await response.json();
-    return extractAiText(data);
-  } finally {
-    clearTimeout(timeout);
   }
+
+  clearTimeout(timeout);
+  if (lastError) throw lastError;
+  return null;
 }
 
 function buildOfflineReply(input) {
@@ -139,6 +184,13 @@ async function buildReply(userId, input) {
     }
   } catch (error) {
     console.error("Groq curhat error:", error.message);
+  }
+
+  const freeAiReply = await fetchPollinations(input, NARA_SYSTEM_PROMPT);
+  if (freeAiReply) {
+    remember(userId, "user", input);
+    remember(userId, "assistant", freeAiReply);
+    return freeAiReply;
   }
 
   const fallback = buildOfflineReply(input);

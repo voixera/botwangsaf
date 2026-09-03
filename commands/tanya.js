@@ -525,37 +525,82 @@ async function askGroq(question) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25000);
 
+  const modelsToTry = Array.from(
+    new Set([
+      GROQ_MODEL,
+      "llama-3.3-70b-versatile",
+      "llama3-8b-8192",
+      "llama3-70b-8192",
+      "mixtral-8x7b-32768",
+      "gemma2-9b-it",
+    ])
+  );
+
+  let lastError = null;
+  for (const modelName of modelsToTry) {
+    try {
+      const response = await fetch(GROQ_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: modelName,
+          temperature: 0.3,
+          messages: [
+            {
+              role: "system",
+              content: AI_SYSTEM_PROMPT,
+            },
+            {
+              role: "user",
+              content: question,
+            },
+          ],
+        }),
+        signal: controller.signal,
+      });
+
+      if (response.ok) {
+        clearTimeout(timeout);
+        const data = await response.json();
+        return extractAiText(data);
+      }
+
+      const errorText = await response.text();
+      lastError = new Error(`Groq API error (${modelName}) ${response.status}: ${errorText}`);
+    } catch (err) {
+      lastError = err;
+      if (err.name === "AbortError") break;
+    }
+  }
+
+  clearTimeout(timeout);
+  if (lastError) throw lastError;
+  return null;
+}
+
+async function fetchPollinations(prompt, systemPrompt) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
   try {
-    const response = await fetch(GROQ_API_URL, {
+    const res = await fetch("https://text.pollinations.ai/", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: GROQ_MODEL,
-        temperature: 0.3,
         messages: [
-          {
-            role: "system",
-            content: AI_SYSTEM_PROMPT,
-          },
-          {
-            role: "user",
-            content: question,
-          },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt },
         ],
       }),
       signal: controller.signal,
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Groq API error ${response.status}: ${errorText}`);
-    }
-
-    const data = await response.json();
-    return extractAiText(data);
+    if (!res.ok) return null;
+    const text = await res.text();
+    return text.trim() || null;
+  } catch {
+    return null;
   } finally {
     clearTimeout(timeout);
   }
@@ -571,13 +616,12 @@ async function buildReply(input) {
     console.error("Groq tanya error:", error.message);
   }
 
-  return GROQ_API_KEY
-    ? answerQuestion(input)
-    : [
-        "Mode AI belum aktif karena `GROQ_API_KEY` belum diatur.",
-        "",
-        answerQuestion(input),
-      ].join("\n");
+  const freeAiReply = await fetchPollinations(input, AI_SYSTEM_PROMPT);
+  if (freeAiReply) {
+    return freeAiReply;
+  }
+
+  return answerQuestion(input);
 }
 
 module.exports = {
