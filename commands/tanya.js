@@ -1,5 +1,7 @@
 const QUESTION_HINTS =
   /\b(siapa|apa|kapan|di mana|dimana|kenapa|gimana|bagaimana|berapa|jelaskan|jelasin|beda|vs|versus|cara|how to|hitung|jam berapa|tanggal)\b/i;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.openai_api_key;
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
@@ -608,7 +610,48 @@ async function fetchPollinations(prompt, systemPrompt) {
   }
 }
 
+async function askOpenAI(question) {
+  if (!OPENAI_API_KEY) return null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000);
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        temperature: 0.3,
+        messages: [
+          { role: "system", content: AI_SYSTEM_PROMPT },
+          { role: "user", content: question },
+        ],
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`OpenAI error ${res.status}: ${err}`);
+    }
+    const data = await res.json();
+    return extractAiText(data);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function buildReply(input) {
+  try {
+    const gptReply = await askOpenAI(input);
+    if (gptReply) {
+      return gptReply;
+    }
+  } catch (error) {
+    console.error("OpenAI tanya error:", error.message);
+  }
+
   try {
     const aiReply = await askGroq(input);
     if (aiReply) {

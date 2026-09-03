@@ -1,4 +1,6 @@
 const PERSONA_NAME = process.env.CURHAT_PERSONA_NAME || "Nara";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.openai_api_key;
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const GROQ_API_URL =
   process.env.GROQ_API_URL || "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = process.env.GROQ_MODEL || process.env.groq_model || "llama-3.1-8b-instant";
@@ -50,6 +52,40 @@ function extractAiText(payload) {
   }
 
   return null;
+}
+
+async function askOpenAI(userId, input) {
+  if (!OPENAI_API_KEY) return null;
+  const history = getHistory(userId);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        temperature: 0.7,
+        messages: [
+          { role: "system", content: NARA_SYSTEM_PROMPT },
+          ...history,
+          { role: "user", content: input },
+        ],
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`OpenAI error ${res.status}: ${err}`);
+    }
+    const data = await res.json();
+    return extractAiText(data);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function fetchPollinations(prompt, systemPrompt) {
@@ -177,6 +213,17 @@ function buildOfflineReply(input) {
 }
 
 async function buildReply(userId, input) {
+  try {
+    const gptReply = await askOpenAI(userId, input);
+    if (gptReply) {
+      remember(userId, "user", input);
+      remember(userId, "assistant", gptReply);
+      return gptReply;
+    }
+  } catch (error) {
+    console.error("OpenAI curhat error:", error.message);
+  }
+
   try {
     const aiReply = await askGroq(userId, input);
     if (aiReply) {
