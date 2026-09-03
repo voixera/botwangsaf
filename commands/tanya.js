@@ -529,10 +529,12 @@ async function askGroq(question) {
     new Set([
       GROQ_MODEL,
       "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant",
+      "llama-3.2-1b-preview",
+      "llama-3.2-3b-preview",
       "llama3-8b-8192",
       "llama3-70b-8192",
       "mixtral-8x7b-32768",
-      "gemma2-9b-it",
     ])
   );
 
@@ -616,9 +618,13 @@ async function buildReply(input) {
     console.error("Groq tanya error:", error.message);
   }
 
-  const freeAiReply = await fetchPollinations(input, AI_SYSTEM_PROMPT);
-  if (freeAiReply) {
-    return freeAiReply;
+  try {
+    const freeAiReply = await fetchPollinations(input, AI_SYSTEM_PROMPT);
+    if (freeAiReply) {
+      return freeAiReply;
+    }
+  } catch (e) {
+    console.error("Pollinations tanya error:", e.message);
   }
 
   return answerQuestion(input);
