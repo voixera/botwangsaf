@@ -30,7 +30,7 @@ RUN apt-get update \
       xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-RUN python3 -m pip install --no-cache-dir --break-system-packages --upgrade "yt-dlp[default]"
+RUN python3 -m pip install --no-cache-dir --break-system-packages --upgrade "yt-dlp[default,curl-cffi]"
 
 COPY package*.json ./
 RUN npm ci --omit=dev

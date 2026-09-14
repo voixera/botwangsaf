@@ -74,7 +74,7 @@ async function download(input, kind = "video") {
 
   const id = randomUUID();
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "wa-download-"));
-    const output = path.join(dir, "media.%(ext)s");
+  const output = path.join(dir, "media.%(ext)s");
   active.add(id);
   try {
     const args = ["--ignore-config", "--no-playlist", "--restrict-filenames", "--max-filesize", String(MAX_BYTES), "--match-filter", `duration <= ${MAX_DURATION}`, "--print", "after_move:filepath", "-o", output];
@@ -103,7 +103,7 @@ async function download(input, kind = "video") {
       throw new Error("Instagram menolak akses provider. Pastikan akun/konten publik dan coba lagi nanti.");
     }
     if (/Unexpected response|impersonat|JSON object must be str|NoneType|TikTok/i.test(raw) && target.platform === "TikTok") {
-      throw new Error("TikTok menolak request provider. Deploy ulang image terbaru agar curl-cffi dan impersonation terpasang, lalu coba lagi.");
+      throw new Error("TikTok menolak request provider. Pastikan image sudah rebuild dengan curl-cffi, lalu coba lagi.");
     }
     const detail = raw.split(/\r?\n/).filter(Boolean).pop();
     throw new Error(detail?.slice(0, 180) || "Link tidak bisa diproses. Pastikan konten publik dan link masih valid.");
