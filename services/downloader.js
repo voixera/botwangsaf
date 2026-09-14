@@ -80,8 +80,13 @@ async function download(input, kind = "video") {
     const args = ["--ignore-config", "--no-playlist", "--restrict-filenames", "--max-filesize", String(MAX_BYTES), "--match-filter", `duration <= ${MAX_DURATION}`, "--print", "after_move:filepath", "-o", output];
     if (target.platform === "TikTok") args.push("--impersonate", "chrome");
     if (kind === "audio") args.push("-x", "--audio-format", "mp3", "--audio-quality", "5");
-    else if (target.platform === "TikTok") args.push("-f", "b[ext=mp4]/b");
-    else args.push("-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b", "--merge-output-format", "mp4", "--compat-options", "no-youtube-unavailable-videos");
+    else args.push(
+      "-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b",
+      "--merge-output-format", "mp4",
+      "--remux-video", "mp4",
+      "--postprocessor-args", "Merger+ffmpeg:-movflags +faststart",
+      "--compat-options", "no-youtube-unavailable-videos",
+    );
     args.push(target.url);
 
     const { stdout } = await execFileAsync(YTDLP_PATH, args, {
