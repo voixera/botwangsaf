@@ -55,8 +55,9 @@ async function resolveUrl(target) {
     });
     const resolved = response.url;
     const parsed = resolved && parseUrl(resolved);
-    if (parsed && /\/video\/\d+/i.test(new URL(parsed.url).pathname)) return parsed;
-    throw new Error("Link pendek TikTok tidak mengarah ke video. Kirim link TikTok asli dari halaman video.");
+    // Keep original short URL when HTTP redirect loses TikTok's video ID.
+    // yt-dlp can resolve valid short links with its own extractor session.
+    return parsed && /\/video\/\d+/i.test(new URL(parsed.url).pathname) ? parsed : target;
   } catch (error) {
     if (error?.name === "AbortError") throw new Error("Resolving short-link TikTok timeout.");
     throw error;
@@ -73,14 +74,13 @@ async function download(input, kind = "video") {
 
   const id = randomUUID();
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "wa-download-"));
-  const output = path.join(dir, "media.%(ext)s");
+    const output = path.join(dir, "media.%(ext)s");
   active.add(id);
   try {
     const args = ["--ignore-config", "--no-playlist", "--restrict-filenames", "--max-filesize", String(MAX_BYTES), "--match-filter", `duration <= ${MAX_DURATION}`, "--print", "after_move:filepath", "-o", output];
-    if (target.platform === "TikTok") {
-      args.push("--extractor-args", "tiktok:app_name=musical_ly;manifest_app_version=31.0.0");
-    }
+    if (target.platform === "TikTok") args.push("--impersonate", "chrome");
     if (kind === "audio") args.push("-x", "--audio-format", "mp3", "--audio-quality", "5");
+    else if (target.platform === "TikTok") args.push("-f", "b[ext=mp4]/b");
     else args.push("-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b", "--merge-output-format", "mp4", "--compat-options", "no-youtube-unavailable-videos");
     args.push(target.url);
 
@@ -102,8 +102,8 @@ async function download(input, kind = "video") {
     if (/login page|login required|rate-limit reached|requested content is not available/i.test(raw) && target.platform === "Instagram") {
       throw new Error("Instagram menolak akses provider. Pastikan akun/konten publik dan coba lagi nanti.");
     }
-    if (/JSON object must be str|NoneType|TikTok/i.test(raw) && target.platform === "TikTok") {
-      throw new Error("TikTok gagal dibaca provider. Pastikan video publik dan coba link TikTok asli, bukan link pendek.");
+    if (/Unexpected response|impersonat|JSON object must be str|NoneType|TikTok/i.test(raw) && target.platform === "TikTok") {
+      throw new Error("TikTok menolak request provider. Deploy ulang image terbaru agar curl-cffi dan impersonation terpasang, lalu coba lagi.");
     }
     const detail = raw.split(/\r?\n/).filter(Boolean).pop();
     throw new Error(detail?.slice(0, 180) || "Link tidak bisa diproses. Pastikan konten publik dan link masih valid.");
