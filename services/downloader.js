@@ -77,7 +77,7 @@ async function download(input, kind = "video") {
   const output = path.join(dir, "media.%(ext)s");
   active.add(id);
   try {
-    const args = ["--ignore-config", "--no-playlist", "--restrict-filenames", "--max-filesize", String(MAX_BYTES), "--match-filter", `duration <= ${MAX_DURATION}`, "--print", "after_move:filepath", "-o", output];
+    const args = ["--ignore-config", "--no-playlist", "--restrict-filenames", "--max-filesize", String(MAX_BYTES), "--match-filter", `duration <= ${MAX_DURATION}`, "--print", "after_move:filepath", "--print", "after_move:duration", "-o", output];
     if (target.platform === "TikTok") args.push("--impersonate", "chrome");
     if (kind === "audio") args.push("-x", "--audio-format", "mp3", "--audio-quality", "5");
     else args.push(
@@ -94,12 +94,14 @@ async function download(input, kind = "video") {
       maxBuffer: 1024 * 1024,
       windowsHide: true,
     });
-    const file = stdout.trim().split(/\r?\n/).pop();
+    const lines = stdout.trim().split(/\r?\n/);
+    const file = lines.find((line) => line.startsWith(dir));
     if (!file) throw new Error("Provider tidak mengembalikan file.");
     const stat = await fs.stat(file);
     if (stat.size > MAX_BYTES) throw new Error(`File terlalu besar (${formatBytes(stat.size)}). Batas ${formatBytes(MAX_BYTES)}.`);
     const data = await fs.readFile(file);
-    return { ...target, data, size: stat.size, kind };
+    const duration = Number(lines[lines.indexOf(file) + 1]);
+    return { ...target, data, size: stat.size, duration: Number.isFinite(duration) ? Math.round(duration) : undefined, kind };
   } catch (error) {
     if (error?.code === "ENOENT") throw new Error("yt-dlp belum terpasang. Install yt-dlp atau set YTDLP_PATH.");
     if (error?.killed || error?.code === "ETIMEDOUT") throw new Error("Download timeout.");

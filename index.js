@@ -162,7 +162,7 @@ function sendContent(sock, jid, content, options = {}) {
       return sock.sendMessage(jid, { sticker: buffer }, options);
     }
     const type = content.mimetype.startsWith("video/") ? "video" : content.mimetype.startsWith("audio/") ? "audio" : "image";
-    return sock.sendMessage(jid, { [type]: buffer, caption: options.caption || "" }, options);
+    return sock.sendMessage(jid, { [type]: buffer, caption: options.caption || "", ...(type === "video" && Number.isFinite(content.seconds) ? { seconds: content.seconds } : {}) }, options);
   }
   if (content?.id?._serialized) return sock.sendMessage(jid, { text: content.id._serialized }, options);
   return sock.sendMessage(jid, { text: String(content ?? "") }, options);

@@ -25,7 +25,7 @@ async function executeDownload({ message, text, commandName = "download" }) {
   try {
     const result = await download(target.url, kind);
     const mimetype = kind === "audio" ? "audio/mpeg" : "video/mp4";
-    await message.reply({ mimetype, data: result.data.toString("base64"), filename: kind === "audio" ? "audio.mp3" : "video.mp4" }, undefined, {
+    await message.reply({ mimetype, data: result.data.toString("base64"), filename: kind === "audio" ? "audio.mp3" : "video.mp4", seconds: result.duration }, undefined, {
       caption: box("DOWNLOAD COMPLETE", [`Platform: ${result.platform}`, "Status: Success"]),
     });
   } catch (error) {
