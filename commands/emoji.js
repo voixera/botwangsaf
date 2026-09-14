@@ -1,4 +1,4 @@
-const { Resvg } = require("@resvg/resvg-js");
+const puppeteer = require("puppeteer");
 const { Sticker, StickerTypes } = require("wa-sticker-formatter");
 
 const emojiPattern = /\p{Extended_Pictographic}|\p{Regional_Indicator}{2}|\p{Emoji_Component}/u;
@@ -11,11 +11,30 @@ function parseEmoji(text) {
     .filter(Boolean);
 }
 
-function buildSvg(items) {
-  const gap = 768 / (items.length + 1);
-  const size = Math.min(180, Math.floor(620 / Math.max(items.length, 3)));
-  const nodes = items.map((item, index) => `<text x="${Math.round(gap * (index + 1))}" y="410" text-anchor="middle" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif" font-size="${size}">${item}</text>`).join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="768" height="768" viewBox="0 0 768 768"><rect width="768" height="768" fill="none"/>${nodes}</svg>`;
+function escapeHtml(value) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[character]));
+}
+
+async function renderEmoji(items) {
+  const browser = await puppeteer.launch({
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROMIUM_PATH || undefined,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    headless: true,
+  });
+  try {
+    const page = await browser.newPage({ viewport: { width: 768, height: 768, deviceScaleFactor: 1 } });
+    await page.setContent(`<!doctype html><style>
+      html,body { margin:0; width:768px; height:768px; overflow:hidden; background:transparent; }
+      main { width:768px; height:768px; display:flex; align-items:center; justify-content:center; gap:36px; }
+      span { font: 190px/1 "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif; }
+    </style><main>${items.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</main>`, { waitUntil: "load" });
+    await page.evaluate(() => document.fonts.ready);
+    return page.screenshot({ type: "png", omitBackground: true });
+  } finally {
+    await browser.close();
+  }
 }
 
 module.exports = {
@@ -30,7 +49,7 @@ module.exports = {
     }
     await message.reply("╭───「 EMOJI STICKER 」───\n│ Processing your emojis...\n╰────────────────");
     try {
-      const png = new Resvg(buildSvg(items), { fitTo: { mode: "width", value: 768 } }).render().asPng();
+      const png = await renderEmoji(items);
       const webp = await new Sticker(png, {
         pack: state.config.stickerPackname,
         author: state.config.stickerAuthor,

@@ -12,6 +12,7 @@ RUN apt-get update \
       chromium \
       dumb-init \
       ffmpeg \
+      fonts-noto-color-emoji \
       python3-pip \
       fonts-liberation \
       libasound2 \

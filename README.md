@@ -28,7 +28,7 @@ Command: `.download <URL>`, `.video <URL>`, `.audio <URL>`, `.tiktok <URL>`, `.i
 
 Downloader memakai `yt-dlp` sebagai provider lokal. Konten privat, DRM, login, paywall, playlist, dan link yang tidak dapat diakses tidak dipaksa. Batas default: 64 MB, 15 menit, 2 download bersamaan, timeout 120 detik. Override lewat `YTDLP_PATH`, `DOWNLOADER_TIMEOUT_MS`, `DOWNLOADER_MAX_BYTES`, `DOWNLOADER_MAX_DURATION`, dan `DOWNLOADER_MAX_CONCURRENT`.
 
-Emoji sticker: `.emoji 😁 + 🙏` atau `.emoji 😂 + ❤️ + 🔥`. Renderer memakai `@resvg/resvg-js`; font emoji berwarna bergantung font yang tersedia di host. Docker memakai font system, tetapi emoji tertentu bisa gagal dirender.
+Emoji sticker: `.emoji 😁 + 🙏` atau `.emoji 😂 + ❤️ + 🔥`. Renderer memakai Chromium dengan `Noto Color Emoji`, lalu menghasilkan PNG transparan dan WebP sticker.
 ## Login dan session
 
 Local memakai `.baileys_auth-local`, sedangkan Railway memakai `/data/.baileys_auth-server` (pasang Railway Volume ke `/data`). Session jangan disalin silang.
