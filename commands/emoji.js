@@ -33,12 +33,12 @@ async function renderEmoji(items) {
   });
   const browser = await browserPromise;
   try {
-    const page = await browser.newPage({ viewport: { width: 768, height: 768, deviceScaleFactor: 1 } });
+    const page = await browser.newPage({ viewport: { width: 512, height: 512, deviceScaleFactor: 1 } });
     const columns = items.length <= 2 ? 2 : 3;
-    const fontSize = items.length <= 2 ? 300 : items.length <= 4 ? 250 : 190;
+    const fontSize = items.length <= 2 ? 360 : items.length <= 4 ? 290 : 220;
     await page.setContent(`<!doctype html><style>
-      html,body { margin:0; width:768px; height:768px; overflow:hidden; background:transparent; }
-      main { width:768px; height:768px; display:grid; grid-template-columns:repeat(${columns}, 1fr); grid-auto-rows:1fr; gap:8px; align-items:center; justify-items:center; }
+      html,body { margin:0; width:512px; height:512px; overflow:hidden; background:transparent; }
+      main { width:512px; height:512px; display:grid; grid-template-columns:repeat(${columns}, 1fr); grid-auto-rows:1fr; gap:0; align-items:center; justify-items:center; }
       span { font: ${fontSize}px/1 "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif; }
     </style><main>${items.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</main>`, { waitUntil: "load" });
     await page.evaluate(() => document.fonts.ready);

@@ -101,10 +101,11 @@ async function download(input, kind = "video") {
     if (stat.size > MAX_BYTES) throw new Error(`File terlalu besar (${formatBytes(stat.size)}). Batas ${formatBytes(MAX_BYTES)}.`);
     const data = await fs.readFile(file);
     const { stdout: durationOutput } = await execFileAsync(FFPROBE_PATH, [
-      "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", file,
+      "-v", "error", "-show_entries", "format=duration:stream=duration", "-of", "default=noprint_wrappers=1:nokey=1", file,
     ], { timeout: 10000, windowsHide: true });
-    const duration = Number(durationOutput.trim());
-    return { ...target, data, size: stat.size, duration: Number.isFinite(duration) ? Math.round(duration) : undefined, kind };
+    const duration = durationOutput.trim().split(/\r?\n/).map(Number).find((value) => Number.isFinite(value) && value > 0);
+    if (!duration) throw new Error("Video tidak memiliki metadata durasi yang valid.");
+    return { ...target, data, size: stat.size, duration: Math.max(1, Math.round(duration)), kind };
   } catch (error) {
     if (error?.code === "ENOENT") throw new Error("yt-dlp belum terpasang. Install yt-dlp atau set YTDLP_PATH.");
     if (error?.killed || error?.code === "ETIMEDOUT") throw new Error("Download timeout.");
