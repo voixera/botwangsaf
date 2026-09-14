@@ -99,6 +99,9 @@ async function download(input, kind = "video") {
     if (error?.code === "ENOENT") throw new Error("yt-dlp belum terpasang. Install yt-dlp atau set YTDLP_PATH.");
     if (error?.killed || error?.code === "ETIMEDOUT") throw new Error("Download timeout.");
     const raw = String(error?.stderr || error?.message || "provider gagal");
+    if (/login page|login required|rate-limit reached|requested content is not available/i.test(raw) && target.platform === "Instagram") {
+      throw new Error("Instagram menolak akses provider. Pastikan akun/konten publik dan coba lagi nanti.");
+    }
     if (/JSON object must be str|NoneType|TikTok/i.test(raw) && target.platform === "TikTok") {
       throw new Error("TikTok gagal dibaca provider. Pastikan video publik dan coba link TikTok asli, bukan link pendek.");
     }

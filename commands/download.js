@@ -1,4 +1,3 @@
-const fs = require("fs/promises");
 const { download, findUrl, parseUrl } = require("../services/downloader");
 
 const activeLinks = new Set();
@@ -25,9 +24,8 @@ async function executeDownload({ message, text, commandName = "download" }) {
   await message.reply(box("DOWNLOAD", [`Platform: ${target.platform}`, "Status: Processing..."]));
   try {
     const result = await download(target.url, kind);
-    const buffer = await fs.readFile(result.file);
     const mimetype = kind === "audio" ? "audio/mpeg" : "video/mp4";
-    await message.reply({ mimetype, data: buffer.toString("base64"), filename: kind === "audio" ? "audio.mp3" : "video.mp4" }, undefined, {
+    await message.reply({ mimetype, data: result.data.toString("base64"), filename: kind === "audio" ? "audio.mp3" : "video.mp4" }, undefined, {
       caption: box("DOWNLOAD COMPLETE", [`Platform: ${result.platform}`, "Status: Success"]),
     });
   } catch (error) {
