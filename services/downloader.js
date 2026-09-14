@@ -81,7 +81,7 @@ async function download(input, kind = "video") {
     if (target.platform === "TikTok") args.push("--impersonate", "chrome");
     if (kind === "audio") args.push("-x", "--audio-format", "mp3", "--audio-quality", "5");
     else args.push(
-      "-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b",
+      "-f", target.platform === "TikTok" ? "b[ext=mp4]/b" : "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b",
       "--merge-output-format", "mp4",
       "--recode-video", "mp4",
       "--postprocessor-args", "VideoConvertor+ffmpeg:-c:v libx264 -c:a aac -pix_fmt yuv420p -movflags +faststart",
@@ -107,7 +107,7 @@ async function download(input, kind = "video") {
     if (/login page|login required|rate-limit reached|requested content is not available/i.test(raw) && target.platform === "Instagram") {
       throw new Error("Instagram menolak akses provider. Pastikan akun/konten publik dan coba lagi nanti.");
     }
-    if (/Unexpected response|impersonat|JSON object must be str|NoneType|TikTok/i.test(raw) && target.platform === "TikTok") {
+    if (/Unexpected response|impersonat|JSON object must be str|NoneType/i.test(raw) && target.platform === "TikTok") {
       throw new Error("TikTok menolak request provider. Pastikan image sudah rebuild dengan curl-cffi, lalu coba lagi.");
     }
     const detail = raw.split(/\r?\n/).filter(Boolean).pop();
