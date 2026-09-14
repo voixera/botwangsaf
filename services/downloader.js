@@ -54,8 +54,11 @@ async function download(input, kind = "video") {
   active.add(id);
   try {
     const args = ["--ignore-config", "--no-playlist", "--restrict-filenames", "--max-filesize", String(MAX_BYTES), "--match-filter", `duration <= ${MAX_DURATION}`, "--print", "after_move:filepath", "-o", output];
+    if (target.platform === "TikTok") {
+      args.push("--extractor-args", "tiktok:app_name=musical_ly;manifest_app_version=31.0.0");
+    }
     if (kind === "audio") args.push("-x", "--audio-format", "mp3", "--audio-quality", "5");
-    else args.push("-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b", "--merge-output-format", "mp4");
+    else args.push("-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b", "--merge-output-format", "mp4", "--compat-options", "no-youtube-unavailable-videos");
     args.push(target.url);
 
     const { stdout } = await execFileAsync(YTDLP_PATH, args, {
