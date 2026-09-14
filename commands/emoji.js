@@ -1,5 +1,6 @@
 const puppeteer = require("puppeteer");
 const { Sticker, StickerTypes } = require("wa-sticker-formatter");
+let browserPromise = null;
 
 const emojiPattern = /\p{Extended_Pictographic}|\p{Regional_Indicator}{2}|\p{Emoji_Component}/u;
 
@@ -18,20 +19,21 @@ function escapeHtml(value) {
 }
 
 async function renderEmoji(items) {
-  const browser = await puppeteer.launch({
+  if (!browserPromise) browserPromise = puppeteer.launch({
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROMIUM_PATH || undefined,
     args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--no-zygote",
+      "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
+      "--disable-gpu", "--disable-software-rasterizer", "--no-zygote",
+      "--disable-extensions", "--disable-background-networking",
     ],
-    headless: true,
+    headless: "new",
+  }).catch((error) => {
+    browserPromise = null;
+    throw error;
   });
+  const browser = await browserPromise;
   try {
     const page = await browser.newPage({ viewport: { width: 768, height: 768, deviceScaleFactor: 1 } });
-    page.setDefaultNavigationTimeout(15000);
     await page.setContent(`<!doctype html><style>
       html,body { margin:0; width:768px; height:768px; overflow:hidden; background:transparent; }
       main { width:768px; height:768px; display:flex; align-items:center; justify-content:center; gap:36px; }
@@ -39,9 +41,13 @@ async function renderEmoji(items) {
     </style><main>${items.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</main>`, { waitUntil: "load" });
     await page.evaluate(() => document.fonts.ready);
     await new Promise((resolve) => setTimeout(resolve, 100));
-    return page.screenshot({ type: "png", omitBackground: true });
-  } finally {
-    await browser.close();
+    const image = await page.screenshot({ type: "png", omitBackground: true });
+    await page.close();
+    return image;
+  } catch (error) {
+    browserPromise = null;
+    await browser.close().catch(() => {});
+    throw error;
   }
 }
 
