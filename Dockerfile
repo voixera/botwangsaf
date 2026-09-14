@@ -12,7 +12,7 @@ RUN apt-get update \
       chromium \
       dumb-init \
       ffmpeg \
-      yt-dlp \
+      python3-pip \
       fonts-liberation \
       libasound2 \
       libatk-bridge2.0-0 \
@@ -28,6 +28,8 @@ RUN apt-get update \
       libxrandr2 \
       xdg-utils \
     && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m pip install --no-cache-dir --break-system-packages --upgrade yt-dlp
 
 COPY package*.json ./
 RUN npm ci --omit=dev

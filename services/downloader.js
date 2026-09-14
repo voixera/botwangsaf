@@ -53,7 +53,7 @@ async function download(input, kind = "video") {
   const output = path.join(dir, "media.%(ext)s");
   active.add(id);
   try {
-    const args = ["--no-playlist", "--no-warnings", "--restrict-filenames", "--max-filesize", String(MAX_BYTES), "--match-filter", `duration <= ${MAX_DURATION}`, "--print", "after_move:filepath", "-o", output];
+    const args = ["--ignore-config", "--no-playlist", "--restrict-filenames", "--max-filesize", String(MAX_BYTES), "--match-filter", `duration <= ${MAX_DURATION}`, "--print", "after_move:filepath", "-o", output];
     if (kind === "audio") args.push("-x", "--audio-format", "mp3", "--audio-quality", "5");
     else args.push("-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b", "--merge-output-format", "mp4");
     args.push(target.url);
@@ -72,7 +72,11 @@ async function download(input, kind = "video") {
   } catch (error) {
     if (error?.code === "ENOENT") throw new Error("yt-dlp belum terpasang. Install yt-dlp atau set YTDLP_PATH.");
     if (error?.killed || error?.code === "ETIMEDOUT") throw new Error("Download timeout.");
-    const detail = String(error?.stderr || error?.message || "provider gagal").split(/\r?\n/).filter(Boolean).pop();
+    const raw = String(error?.stderr || error?.message || "provider gagal");
+    if (/JSON object must be str|NoneType|TikTok/i.test(raw) && target.platform === "TikTok") {
+      throw new Error("TikTok gagal dibaca provider. Pastikan video publik dan coba link TikTok asli, bukan link pendek.");
+    }
+    const detail = raw.split(/\r?\n/).filter(Boolean).pop();
     throw new Error(detail?.slice(0, 180) || "Link tidak bisa diproses. Pastikan konten publik dan link masih valid.");
   } finally {
     active.delete(id);
