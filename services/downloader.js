@@ -43,9 +43,26 @@ function formatBytes(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+async function resolveUrl(target) {
+  if (target.platform !== "TikTok" || !/^https?:\/\/(vt|vm)\.tiktok\.com\//i.test(target.url)) return target;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(target.url, { redirect: "manual", signal: controller.signal, headers: { "user-agent": "Mozilla/5.0" } });
+    const location = response.headers.get("location");
+    const resolved = location ? new URL(location, target.url).toString() : null;
+    const parsed = resolved && parseUrl(resolved);
+    if (parsed && /\/video\/\d+/i.test(new URL(parsed.url).pathname)) return parsed;
+    throw new Error("Link pendek TikTok tidak mengarah ke video. Kirim link TikTok asli dari halaman video.");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function download(input, kind = "video") {
-  const target = parseUrl(input);
-  if (!target) throw new Error("URL tidak didukung. Gunakan link publik dari Instagram, TikTok, YouTube, Facebook, X, Pinterest, atau Reddit.");
+  const parsedTarget = parseUrl(input);
+  if (!parsedTarget) throw new Error("URL tidak didukung. Gunakan link publik dari Instagram, TikTok, YouTube, Facebook, X, Pinterest, atau Reddit.");
+  const target = await resolveUrl(parsedTarget);
   if (active.size >= MAX_CONCURRENT) throw new Error("Download sedang penuh. Coba lagi beberapa saat lagi.");
 
   const id = randomUUID();
