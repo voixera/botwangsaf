@@ -14,8 +14,7 @@ module.exports = {
     );
 
     const commandCategories = {
-      "◈ 𝙼𝙴𝙳𝙸𝙰": ["stiker", "brat", "xbg"],
-      "◈ 𝙰𝙸": ["tanya", "endtanya", "curhat", "endcurhat"],
+      "◈ 𝙼𝙴𝙳𝙸𝙰": ["stiker", "brat", "xbg", "emoji", "download", "video", "audio", "tiktok", "ig", "yt"],
       "◈ 𝙼𝙴𝙽𝙵𝙴𝚂𝚂": ["menfess", "endconfess"],
       "◈ 𝚄𝚃𝙸𝙻𝙸𝚃𝚈": [
         "ping",

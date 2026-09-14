@@ -1,10 +1,11 @@
 {
   "name": "waresource-bot-md",
   "version": "1.0.0",
-  "description": "WhatsApp MD bot with menu, stiker, menfess, and brat commands.",
+  "description": "WhatsApp MD bot with menu, stiker, menfess, downloader, and brat commands.",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"

@@ -12,6 +12,7 @@ RUN apt-get update \
       chromium \
       dumb-init \
       ffmpeg \
+      yt-dlp \
       fonts-liberation \
       libasound2 \
       libatk-bridge2.0-0 \

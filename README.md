@@ -1,10 +1,10 @@
 # waresource-bot-md
 
-WhatsApp MD bot dengan command menu, stiker, menfess, curhat, tanya, dan utilitas lain.
+WhatsApp MD bot dengan command menu, stiker, menfess, downloader, emoji sticker, dan utilitas lain.
 
 ## Deploy ke Railway
 
-Repo ini sudah berisi `Dockerfile` dan `railway.json`, jadi Railway akan build container dengan Chromium lalu menjalankan `npm start`.
+Repo ini sudah berisi `Dockerfile` dan `railway.json`, jadi Railway akan build container dengan Chromium, FFmpeg, dan `yt-dlp`, lalu menjalankan `npm start`.
 
 1. Buat project Railway dari repository GitHub ini.
 2. Tambahkan environment variable:
@@ -21,6 +21,14 @@ Healthcheck tersedia di `/health` dan akan aktif otomatis saat Railway memberi v
 npm install
 npm start
 ```
+
+## Downloader dan emoji sticker
+
+Command: `.download <URL>`, `.video <URL>`, `.audio <URL>`, `.tiktok <URL>`, `.ig <URL>`, `.yt <URL>`. Link publik Instagram, TikTok, YouTube, Facebook, X, Pinterest, dan Reddit juga diproses otomatis.
+
+Downloader memakai `yt-dlp` sebagai provider lokal. Konten privat, DRM, login, paywall, playlist, dan link yang tidak dapat diakses tidak dipaksa. Batas default: 64 MB, 15 menit, 2 download bersamaan, timeout 120 detik. Override lewat `YTDLP_PATH`, `DOWNLOADER_TIMEOUT_MS`, `DOWNLOADER_MAX_BYTES`, `DOWNLOADER_MAX_DURATION`, dan `DOWNLOADER_MAX_CONCURRENT`.
+
+Emoji sticker: `.emoji 😁 + 🙏` atau `.emoji 😂 + ❤️ + 🔥`. Renderer memakai `@resvg/resvg-js`; font emoji berwarna bergantung font yang tersedia di host. Docker memakai font system, tetapi emoji tertentu bisa gagal dirender.
 ## Login dan session
 
 Local memakai `.baileys_auth-local`, sedangkan Railway memakai `/data/.baileys_auth-server` (pasang Railway Volume ke `/data`). Session jangan disalin silang.

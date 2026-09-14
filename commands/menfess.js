@@ -209,11 +209,6 @@ module.exports = {
       return;
     }
 
-    if (state.activeCurhat && state.activeCurhat.has(message.from)) {
-      await message.reply("Kamu sedang di mode curhat. Akhiri dulu dengan `.endcurhat`.");
-      return;
-    }
-
     const rawInput = text.trim();
     const [targetRaw = "", targetLabelRaw = "", ...messageParts] = rawInput.split("|");
     const targetJid = helpers.toUserJid(targetRaw);

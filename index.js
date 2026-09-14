@@ -25,7 +25,7 @@ const defaultAuthPath = runtime === "local"
   : path.join(process.env.WA_DATA_DIR || "/data", ".baileys_auth-server");
 const AUTH_PATH = process.env.WA_AUTH_PATH || defaultAuthPath;
 const state = {
-  activeCurhat: new Map(), activeMenfess: new Map(), activeTanya: new Map(),
+  activeMenfess: new Map(),
   lastMedia: new Map(), config: {
     prefixes: PREFIXES,
     stickerPackname: process.env.STICKER_PACKNAME || "Made with ❤️ by DrxDvs",
@@ -161,7 +161,7 @@ function sendContent(sock, jid, content, options = {}) {
     if (content.mimetype === "image/webp" || options.sendMediaAsSticker) {
       return sock.sendMessage(jid, { sticker: buffer }, options);
     }
-    const type = content.mimetype.startsWith("video/") ? "video" : "image";
+    const type = content.mimetype.startsWith("video/") ? "video" : content.mimetype.startsWith("audio/") ? "audio" : "image";
     return sock.sendMessage(jid, { [type]: buffer, caption: options.caption || "" }, options);
   }
   if (content?.id?._serialized) return sock.sendMessage(jid, { text: content.id._serialized }, options);
@@ -193,10 +193,15 @@ async function handleMessage(sock, raw) {
     if (input) {
       const command = commands.get(input.name);
       if (!command) return message.reply("Command tidak dikenal. Ketik `.menu`.");
-      return command.execute({ client, message, args: input.args, text: input.text, state, commands,
+      return command.execute({ client, message, args: input.args, text: input.text, commandName: input.name, state, commands,
         helpers: { normalizeNumber, toUserJid, isPrivateUserChat } });
     }
-    for (const name of ["menfess", "curhat", "tanya"]) {
+    const downloader = commands.get("download");
+    if (downloader?.auto && /https?:\/\/[^\s<>]+/i.test(message.body)) {
+      await downloader.auto({ message, text: message.body });
+      return;
+    }
+    for (const name of ["menfess"]) {
       const command = commands.get(name);
       if (command?.handleSessionMessage && await command.handleSessionMessage({ client, message, state, helpers: { isPrivateUserChat } })) return;
     }
