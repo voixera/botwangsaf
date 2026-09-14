@@ -83,8 +83,8 @@ async function download(input, kind = "video") {
     else args.push(
       "-f", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b",
       "--merge-output-format", "mp4",
-      "--remux-video", "mp4",
-      "--postprocessor-args", "Merger+ffmpeg:-movflags +faststart",
+      "--recode-video", "mp4",
+      "--postprocessor-args", "VideoConvertor+ffmpeg:-c:v libx264 -c:a aac -pix_fmt yuv420p -movflags +faststart",
       "--compat-options", "no-youtube-unavailable-videos",
     );
     args.push(target.url);
