@@ -62,8 +62,9 @@ module.exports = {
         filename: "no-background.png",
       });
     } catch (error) {
-      console.warn(`Penghapusan background gagal: ${error.message}`);
+      log("ERROR", "Penghapusan background gagal", error.message);
       await message.reply("Background gagal dihapus. Coba gambar lain.");
     }
   },
 };
+const { log } = require("../services/logger");

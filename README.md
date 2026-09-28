@@ -1,10 +1,10 @@
 # waresource-bot-md
 
-WhatsApp MD bot dengan command menu, stiker, menfess, downloader, emoji sticker, dan utilitas lain.
+WhatsApp MD bot dengan menu, stiker, menfess, dan utilitas lain.
 
 ## Deploy ke Railway
 
-Repo ini sudah berisi `Dockerfile` dan `railway.json`, jadi Railway akan build container dengan Chromium, FFmpeg, dan `yt-dlp`, lalu menjalankan `npm start`.
+Repo ini sudah berisi `Dockerfile` dan `railway.json`, jadi Railway akan build container lalu menjalankan `npm start`.
 
 1. Buat project Railway dari repository GitHub ini.
 2. Tambahkan environment variable:
@@ -22,17 +22,10 @@ npm install
 npm start
 ```
 
-## Downloader dan emoji sticker
-
-Command: `.download <URL>`, `.video <URL>`, `.audio <URL>`, `.tiktok <URL>`, `.ig <URL>`, `.yt <URL>`. Link publik Instagram, TikTok, YouTube, Facebook, X, Pinterest, dan Reddit juga diproses otomatis.
-
-Downloader memakai `yt-dlp` sebagai provider lokal. Konten privat, DRM, login, paywall, playlist, dan link yang tidak dapat diakses tidak dipaksa. Batas default: 64 MB, 15 menit, 2 download bersamaan, timeout 120 detik. Override lewat `YTDLP_PATH`, `DOWNLOADER_TIMEOUT_MS`, `DOWNLOADER_MAX_BYTES`, `DOWNLOADER_MAX_DURATION`, dan `DOWNLOADER_MAX_CONCURRENT`.
-
-Emoji sticker: `.emoji 😁 + 🙏` atau `.emoji 😂 + ❤️ + 🔥`. Renderer memakai Chromium dengan `Noto Color Emoji`, lalu menghasilkan PNG transparan dan WebP sticker.
 ## Login dan session
 
 Local memakai `.baileys_auth-local`, sedangkan Railway memakai `/data/.baileys_auth-server` (pasang Railway Volume ke `/data`). Session jangan disalin silang.
 
-- QR: `LOGIN_METHOD=qr`, jalankan `npm start`, lalu buka link `Buka link ini untuk scan QR WhatsApp` di log. Link bersifat sementara dan memiliki token acak setiap bot mulai.
+- QR: `LOGIN_METHOD=qr`, jalankan `npm start`, lalu buka link QR di log. Link bersifat sementara dan memiliki token acak setiap bot mulai.
 - Pairing: `LOGIN_METHOD=pairing` dan isi `PAIRING_PHONE=628xxxxxxxxxx`; masukkan kode yang muncul ke WhatsApp > Perangkat tertaut > Tautkan dengan nomor telepon.
 - Setelah berhasil, session tersimpan otomatis dan bot akan reconnect tanpa scan ulang.
