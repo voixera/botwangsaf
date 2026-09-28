@@ -6,13 +6,12 @@ module.exports = {
   aliases: ["botinfo", "infobot"],
   description: "Info singkat bot.",
   usage: "info",
-  async execute({ message, state }) {
+  async execute({ message }) {
     await message.reply(
-      box("𝙳𝚇 𝙱𝙾𝚃", [
+      box("VX Bot", [
         `⌬ Versi  : ${pkg.version || "1.0.0"}`,
         `⌬ Node   : ${process.version}`,
-        `⌬ Prefix : ${state.config.prefixes.join(" ")}`,
-        "⌬ Fitur  : media, AI, menfess, utilitas",
+        "⌬ Fitur  : media, menfess, utilitas",
       ])
     );
   },

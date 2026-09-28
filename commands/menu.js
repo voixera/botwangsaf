@@ -5,24 +5,21 @@ const { MessageMedia } = require("whatsapp-web.js");
 module.exports = {
   name: "menu",
   aliases: ["help"],
-  description: "Menampilkan daftar command DX Bot.",
+  description: "Menampilkan daftar command VX Bot.",
   usage: "menu",
-  async execute({ message, commands, state }) {
-    const prefix = state.config.prefixes[0];
+  async execute({ message, commands }) {
     const uniqueCommands = [...new Set(commands.values())].sort((a, b) =>
       a.name.localeCompare(b.name)
     );
 
     const commandCategories = {
-      "◈ 𝙼𝙴𝙳𝙸𝙰": ["stiker", "brat", "xbg", "emoji", "download", "video", "audio", "tiktok", "ig", "yt"],
-      "◈ 𝙼𝙴𝙽𝙵𝙴𝚂𝚂": ["menfess", "endconfess"],
-      "◈ 𝚄𝚃𝙸𝙻𝙸𝚃𝚈": [
+      "Media": ["stiker", "xbg", "video", "audio", "tiktok", "ig", "yt"],
+      "Menfess": ["menfess", "endconfess"],
+      "Utilitas": [
         "ping",
         "runtime",
         "info",
         "id",
-        "owner",
-        "prefix",
         "quote",
         "grupinfo",
       ],
@@ -40,7 +37,7 @@ module.exports = {
 
     const line = "━━━━━━━━━━━━━━━━━━━━";
     const thinLine = "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄";
-    const formatCommand = (cmd) => `┃ ⌬ ${prefix}${cmd.name}`;
+    const formatCommand = (cmd) => `┃ ${cmd.name}`;
 
     const formatCategory = (category) => {
       const names = commandCategories[category];
@@ -60,8 +57,8 @@ module.exports = {
       : "";
 
     const menuText = [
-      "╭━━〔 *𝙳𝚇 𝙱𝙾𝚃* 〕━━╮",
-      "┃ 𝙼𝙰𝙸𝙽 𝙼𝙴𝙽𝚄",
+      "╭━━〔 *VX Bot* 〕━━╮",
+      "┃ Menu utama",
       "╰━━━━━━━━━━━━━━━━╯",
       "",
       line,
@@ -69,11 +66,11 @@ module.exports = {
       otherList ? `${thinLine}\n${otherList}` : "",
       line,
       "",
-      `Prefix aktif: *${state.config.prefixes.join(" ")}*`,
+      "Ketik nama command tanpa prefix.",
       line,
     ].join("\n");
 
-    const imagePath = path.join(__dirname, "..", "assets", "chat.jpeg");
+    const imagePath = path.join(__dirname, "..", "assets", "chat.jpg");
     if (fs.existsSync(imagePath)) {
       const media = MessageMedia.fromFilePath(imagePath);
       await message.reply(media, undefined, { caption: menuText });
