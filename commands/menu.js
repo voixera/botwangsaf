@@ -7,7 +7,7 @@ module.exports = {
   aliases: ["help"],
   description: "Menampilkan daftar command VX Bot.",
   usage: "menu",
-  async execute({ message, commands }) {
+  async execute({ message, commands, state }) {
     const uniqueCommands = [...new Set(commands.values())].sort((a, b) =>
       a.name.localeCompare(b.name)
     );
@@ -37,7 +37,7 @@ module.exports = {
 
     const line = "━━━━━━━━━━━━━━━━━━━━";
     const thinLine = "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄";
-    const formatCommand = (cmd) => `┃ ${cmd.name}`;
+    const formatCommand = (cmd) => `┃ ${state.config.prefixes[0]}${cmd.name}`;
 
     const formatCategory = (category) => {
       const names = commandCategories[category];
@@ -66,7 +66,7 @@ module.exports = {
       otherList ? `${thinLine}\n${otherList}` : "",
       line,
       "",
-      "Ketik nama command tanpa prefix.",
+      `Prefix aktif: ${state.config.prefixes.join(" ")}`,
       line,
     ].join("\n");
 

@@ -18,6 +18,7 @@ const {
   jidDecode,
 } = require("@whiskeysockets/baileys");
 
+const PREFIXES = [".", "/", "!"];
 // Keep local and Railway credentials completely separate.  A Railway volume can
 // be mounted at /data; locally the credentials stay in the project directory.
 const runtime = process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV || "local";
@@ -28,6 +29,7 @@ const AUTH_PATH = process.env.WA_AUTH_PATH || defaultAuthPath;
 const state = {
   activeMenfess: new Map(),
   lastMedia: new Map(), config: {
+    prefixes: PREFIXES,
     stickerPackname: process.env.STICKER_PACKNAME || "Made with ❤️ by DrxDvs",
     stickerAuthor: process.env.STICKER_AUTHOR || "ENGINE V6 | DrxDvs",
   },
@@ -98,10 +100,16 @@ function toUserJid(value) { const n = normalizeNumber(value); return n ? `${n}@s
 function isPrivateUserChat(message) { return !String(message.from).endsWith("@g.us"); }
 function parseCommand(body) {
   const text = String(body || "").trim();
-  const match = text.match(/^\/?([a-z][a-z0-9_-]*)(?:\s+([\s\S]*))?$/i);
+  if (/^\/verify(?:\s|$)/i.test(text)) {
+    const [, ...args] = text.slice(1).trim().split(/\s+/);
+    return { prefix: "/", name: "verify", args, text: args.join(" ") };
+  }
+  const prefix = PREFIXES.find((item) => text.startsWith(item));
+  if (!prefix) return null;
+  const match = text.slice(prefix.length).trim().match(/^([a-z][a-z0-9_-]*)(?:\s+([\s\S]*))?$/i);
   if (!match || (match[1].toLowerCase() !== "verify" && !commands.has(match[1].toLowerCase()))) return null;
   const args = match[2] ? match[2].trim().split(/\s+/) : [];
-  return { prefix: "", name: match[1].toLowerCase(), args, text: args.join(" ") };
+  return { prefix, name: match[1].toLowerCase(), args, text: args.join(" ") };
 }
 function loadCommands() {
   const map = new Map();
@@ -214,7 +222,7 @@ async function handleMessage(sock, raw) {
         return;
       }
       const command = commands.get(input.name);
-      if (!command) return message.reply("Command tidak dikenal. Ketik `.menu`.");
+      if (!command) return message.reply(`Command tidak dikenal. Ketik ${PREFIXES[0]}menu.`);
       return command.execute({ client, message, args: input.args, text: input.text, commandName: input.name, state, commands,
         helpers: { normalizeNumber, toUserJid, isPrivateUserChat } });
     }
