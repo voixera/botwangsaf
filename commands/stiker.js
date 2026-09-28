@@ -175,9 +175,7 @@ module.exports = {
         try {
           sourceMessage = await getQuotedMediaWithRetry(message);
         } catch (error) {
-          console.warn(
-            `Media reply untuk stiker tidak tersedia: ${getErrorMessage(error)}`
-          );
+          log("WARN", "Media reply stiker tidak tersedia", getErrorMessage(error));
         }
       }
 
@@ -195,9 +193,7 @@ module.exports = {
     try {
       media = await downloadMediaWithRetry(sourceMessage);
     } catch (error) {
-      console.warn(
-        `Media stiker gagal diunduh: ${getErrorMessage(error)}`
-      );
+      log("WARN", "Media stiker gagal diunduh", getErrorMessage(error));
       await message.reply("Media gagal diunduh. Coba kirim ulang gambar/video lalu ketik `.s`.");
       return;
     }
@@ -224,7 +220,7 @@ module.exports = {
         stickerAuthor: state.config.stickerAuthor,
       });
     } catch (error) {
-      console.warn(`Pembuatan stiker gagal: ${getErrorMessage(error)}`);
+      log("ERROR", "Pembuatan stiker gagal", getErrorMessage(error));
       await message.reply(
         isVideo
           ? "Video tidak bisa dijadikan stiker. Gunakan video pendek (maks. 16 detik) atau gambar, lalu ketik `.s`."
@@ -233,3 +229,4 @@ module.exports = {
     }
   },
 };
+const { log } = require("../services/logger");

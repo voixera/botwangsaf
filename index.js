@@ -6,6 +6,8 @@ const readline = require("readline");
 const crypto = require("crypto");
 const qrcode = require("qrcode-terminal");
 const P = require("pino");
+const { Resvg } = require("@resvg/resvg-js");
+const { log } = require("./services/logger");
 const {
   default: makeWASocket,
   Browsers,
@@ -16,7 +18,6 @@ const {
   jidDecode,
 } = require("@whiskeysockets/baileys");
 
-const PREFIXES = [".", "/", "!"];
 // Keep local and Railway credentials completely separate.  A Railway volume can
 // be mounted at /data; locally the credentials stay in the project directory.
 const runtime = process.env.RAILWAY_ENVIRONMENT || process.env.NODE_ENV || "local";
@@ -27,7 +28,6 @@ const AUTH_PATH = process.env.WA_AUTH_PATH || defaultAuthPath;
 const state = {
   activeMenfess: new Map(),
   lastMedia: new Map(), config: {
-    prefixes: PREFIXES,
     stickerPackname: process.env.STICKER_PACKNAME || "Made with ❤️ by DrxDvs",
     stickerAuthor: process.env.STICKER_AUTHOR || "ENGINE V6 | DrxDvs",
   },
@@ -35,6 +35,8 @@ const state = {
 const messages = new Map();
 let latestQr = null;
 const qrViewToken = crypto.randomBytes(24).toString("hex");
+let commandCount = 0;
+let captchaAnswer = null;
 
 function publicBaseUrl(port) {
   if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, "");
@@ -85,7 +87,7 @@ function startHealthServer() {
     response.writeHead(404);
     response.end("Not found");
   });
-  server.listen(port, "0.0.0.0", () => console.log(`Health server aktif di port ${port}.`));
+  server.listen(port, "0.0.0.0", () => log("INFO", "Health server aktif", `port=${port}`));
 }
 
 function normalizeNumber(value) {
@@ -96,10 +98,10 @@ function toUserJid(value) { const n = normalizeNumber(value); return n ? `${n}@s
 function isPrivateUserChat(message) { return !String(message.from).endsWith("@g.us"); }
 function parseCommand(body) {
   const text = String(body || "").trim();
-  const prefix = PREFIXES.find((p) => text.startsWith(p));
-  if (!prefix) return null;
-  const [name, ...args] = text.slice(prefix.length).trim().split(/\s+/);
-  return name ? { prefix, name: name.toLowerCase(), args, text: args.join(" ") } : null;
+  const match = text.match(/^\/?([a-z][a-z0-9_-]*)(?:\s+([\s\S]*))?$/i);
+  if (!match || (match[1].toLowerCase() !== "verify" && !commands.has(match[1].toLowerCase()))) return null;
+  const args = match[2] ? match[2].trim().split(/\s+/) : [];
+  return { prefix: "", name: match[1].toLowerCase(), args, text: args.join(" ") };
 }
 function loadCommands() {
   const map = new Map();
@@ -110,7 +112,7 @@ function loadCommands() {
       if (!command?.name || typeof command.execute !== "function") continue;
       map.set(command.name, command);
       for (const alias of command.aliases || []) map.set(alias, command);
-    } catch (error) { console.warn(`Command ${file} dilewati: ${error.message}`); }
+    } catch (error) { log("WARN", "Command dilewati", `${file}: ${error.message}`); }
   }
   return map;
 }
@@ -186,32 +188,47 @@ async function handleMessage(sock, raw) {
   messages.set(`${message.from}:${raw.key.id}`, message);
   if (message.hasMedia) state.lastMedia.set(message.from, message);
   const input = parseCommand(message.body);
-  console.log(`[Pesan ${message.fromMe ? "sendiri" : "masuk"}] tipe=${message.type} media=${message.hasMedia} body=${JSON.stringify(message.body)}`);
-  if (input) console.log(`[Command] ${input.prefix}${input.name}`);
+  if (!message.fromMe && input) log("INFO", "Command diterima", `command=${input.name} chat=${message.from}`);
   const client = makeClient(sock);
   try {
+    if (captchaAnswer !== null) {
+      const sender = raw.key.participant || raw.key.remoteJid;
+      if (input?.name === "verify" && input.args.join("").toUpperCase() === captchaAnswer.code && sender === captchaAnswer.sender) {
+        captchaAnswer = null;
+        commandCount = 0;
+        await message.reply("Oke, lanjut.");
+      } else {
+        if (input?.name === "verify") await message.reply("Kode salah. Coba lagi.");
+        else await message.reply("Kirim /verify KODE sesuai gambar dulu.");
+      }
+      return;
+    }
     if (input) {
+      commandCount++;
+      if (commandCount === 5) {
+        const code = crypto.randomBytes(3).toString("hex").toUpperCase();
+        captchaAnswer = { code, sender: raw.key.participant || raw.key.remoteJid };
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="160"><rect width="100%" height="100%" fill="#f3f0e8"/><path d="M20 40L400 120M35 145L380 20M70 15L300 145" stroke="#777" stroke-width="3"/><text x="210" y="102" text-anchor="middle" font-family="sans-serif" font-size="58" font-weight="700" letter-spacing="8" fill="#202020">${code}</text></svg>`;
+        const png = new Resvg(svg).render().asPng();
+        await message.reply({ mimetype: "image/png", data: png.toString("base64"), filename: "verify.png" }, undefined, { caption: "Kirim /verify KODE untuk lanjut." });
+        return;
+      }
       const command = commands.get(input.name);
       if (!command) return message.reply("Command tidak dikenal. Ketik `.menu`.");
       return command.execute({ client, message, args: input.args, text: input.text, commandName: input.name, state, commands,
         helpers: { normalizeNumber, toUserJid, isPrivateUserChat } });
     }
-    const downloader = commands.get("download");
-    if (downloader?.auto && /https?:\/\/[^\s<>]+/i.test(message.body)) {
-      await downloader.auto({ message, text: message.body });
-      return;
-    }
     for (const name of ["menfess"]) {
       const command = commands.get(name);
       if (command?.handleSessionMessage && await command.handleSessionMessage({ client, message, state, helpers: { isPrivateUserChat } })) return;
     }
-  } catch (error) { console.error("Error command:", error); await message.reply("Terjadi error saat memproses pesan."); }
+  } catch (error) { log("ERROR", "Command gagal", error.stack || error.message); await message.reply("Terjadi error saat memproses pesan."); }
 }
 async function start(selectedMode) {
   const mode = selectedMode || await chooseLoginMode();
   if (mode === "reset") {
     resetAuthSession();
-    console.log("Sesi dihapus. Jalankan ulang bot untuk login kembali.");
+    log("INFO", "Sesi dihapus", "jalankan ulang bot untuk login kembali");
     return;
   }
   fs.mkdirSync(AUTH_PATH, { recursive: true });
@@ -223,15 +240,15 @@ async function start(selectedMode) {
       new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000)),
     ]);
     version = latest.version;
-    console.log(`Versi WhatsApp Web: ${version.join(".")}`);
-  } catch { console.log("Versi WhatsApp Web terbaru tidak tersedia, memakai versi bawaan Baileys."); }
+    log("INFO", "Versi WhatsApp Web", version.join("."));
+  } catch { log("WARN", "Versi terbaru tidak tersedia", "memakai versi bawaan Baileys"); }
   let sock;
   sock = makeWASocket({
     auth,
     logger: P({ level: "silent" }),
     printQRInTerminal: false,
     ...(version ? { version } : {}),
-    browser: Browsers.windows("WAResource"),
+    browser: Browsers.windows("VX Bot"),
     markOnlineOnConnect: false,
     syncFullHistory: false,
     generateHighQualityLinkPreview: false,
@@ -248,11 +265,11 @@ async function start(selectedMode) {
     pairingRequested = true;
     try {
       const code = await sock.requestPairingCode(phone);
-      console.log(`\nKode pairing: ${code}`);
-      console.log("Buka WhatsApp > Perangkat tertaut > Tautkan perangkat > Tautkan dengan nomor telepon, lalu masukkan kode ini.\n");
+      log("INFO", "Kode pairing", code);
+      log("INFO", "Petunjuk pairing", "WhatsApp > Perangkat tertaut > Tautkan perangkat > Tautkan dengan nomor telepon");
     } catch (error) {
       pairingRequested = false;
-      console.error(`Gagal meminta kode pairing: ${error.message}`);
+      log("ERROR", "Gagal meminta kode pairing", error.message);
     }
   };
   sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
@@ -263,24 +280,24 @@ async function start(selectedMode) {
       latestQr = qr;
       const port = Number(process.env.PORT) || 3000;
       const qrUrl = `${publicBaseUrl(port)}/pairing-qr?token=${qrViewToken}`;
-      console.log(`Buka link ini untuk scan QR WhatsApp: ${qrUrl}`);
+      log("INFO", "QR login siap", qrUrl);
       if (!process.env.PUBLIC_URL && !process.env.RAILWAY_PUBLIC_DOMAIN && runtime !== "local") {
-        console.warn("Set PUBLIC_URL ke domain Railway agar link QR dapat dibuka dari browser.");
+        log("WARN", "PUBLIC_URL belum diatur", "tautan QR mungkin tidak bisa dibuka dari luar server");
       }
     }
     if (connection === "open") {
       latestQr = null;
-      console.log(`Bot Baileys aktif. Nomor: ${jidDecode(sock.user?.id)?.user || sock.user?.id || "-"}`);
-      console.log(`Sesi tersimpan di: ${AUTH_PATH}`);
+      log("INFO", "WhatsApp terhubung", `nomor=${jidDecode(sock.user?.id)?.user || sock.user?.id || "-"}`);
+      log("INFO", "Sesi aktif", AUTH_PATH);
     }
     if (connection === "close") {
       const code = lastDisconnect?.error?.output?.statusCode;
       const reason = lastDisconnect?.error?.message || "alasan tidak diketahui";
       if (code !== DisconnectReason.loggedOut) {
-        console.log(`Koneksi terputus (kode ${code || "-"}: ${reason}), menyambungkan ulang dengan mode ${mode}...`);
+        log("WARN", "Koneksi terputus", `kode=${code || "-"} alasan=${reason} aksi=sambung-ulang mode=${mode}`);
         setTimeout(() => start(mode), 2000);
       }
-      else console.error("Sesi logout. Hapus .baileys_auth lalu jalankan ulang.");
+      else log("ERROR", "Sesi logout", "hapus sesi autentikasi lalu jalankan ulang");
     }
   });
   sock.ev.on("messages.upsert", ({ messages: incoming }) => incoming.forEach((raw) => handleMessage(sock, raw)));
@@ -303,11 +320,11 @@ async function chooseLoginMode() {
   }
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const ask = (question) => new Promise((resolve) => rl.question(question, resolve));
-  console.log("\n=== WAResource Login ===");
-  console.log("1. Login QR");
-  console.log("2. Login Pairing");
-  console.log("3. Reset sesi");
-  console.log(`4. Lanjutkan sesi${hasSession ? " (tersedia)" : " (belum ada sesi)"}`);
+  console.log("\nVX Bot | Pilih metode login");
+  console.log("1  Login QR");
+  console.log("2  Login Pairing");
+  console.log("3  Reset sesi");
+  console.log(`4  Lanjutkan sesi${hasSession ? " (tersedia)" : " (belum ada sesi)"}`);
   const choice = (await ask("Pilih [1-4]: ")).trim();
   rl.close();
   if (choice === "2") return "pairing";
@@ -316,13 +333,13 @@ async function chooseLoginMode() {
   return "qr";
 }
 startHealthServer();
-start().catch((error) => { console.error("Gagal start bot:", error); process.exit(1); });
+start().catch((error) => { log("ERROR", "Bot gagal dijalankan", error.stack || error.message); process.exit(1); });
 
 let closing = false;
 async function shutdown(signal) {
   if (closing) return;
   closing = true;
-  console.log(`Menutup bot (${signal})... Sesi tetap disimpan.`);
+  log("INFO", "Bot dihentikan", `signal=${signal} sesi=tersimpan`);
   process.exit(0);
 }
 process.on("SIGINT", () => shutdown("SIGINT"));
