@@ -191,7 +191,7 @@ function makeClient(sock) {
     getNumberId: async (number) => ({ _serialized: toUserJid(number) }), getContactById: async (jid) => ({ id: { _serialized: jid } }) };
 }
 async function handleMessage(sock, raw) {
-  if (!raw.message || raw.key.remoteJid === "status@broadcast") return;
+  if (!raw.message || raw.key.fromMe || raw.key.remoteJid === "status@broadcast") return;
   const message = makeMessage(sock, raw);
   messages.set(`${message.from}:${raw.key.id}`, message);
   if (message.hasMedia) state.lastMedia.set(message.from, message);
