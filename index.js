@@ -39,6 +39,12 @@ let latestQr = null;
 const qrViewToken = crypto.randomBytes(24).toString("hex");
 let commandCount = 0;
 let captchaAnswer = null;
+// Simpan gambar captcha terakhir supaya bisa dikirim ulang saat kode salah
+// atau user memakai command lain sebelum verify.
+let captchaImage = null;
+// Verify berlaku global: begitu satu orang berhasil verify, semua orang ikut
+// lolos sampai hitungan command kembali mencapai 5.
+const VERIFY_EVERY = 5;
 
 function publicBaseUrl(port) {
   if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/$/, "");
@@ -200,25 +206,37 @@ async function handleMessage(sock, raw) {
   const client = makeClient(sock);
   try {
     if (captchaAnswer !== null) {
-      const sender = raw.key.participant || raw.key.remoteJid;
-      if (input?.name === "verify" && input.args.join("").toUpperCase() === captchaAnswer.code && sender === captchaAnswer.sender) {
+      // Helper mengirim ulang gambar captcha yang sama.
+      const resendCaptcha = () => message.reply(
+        { mimetype: "image/png", data: captchaImage, filename: "verify.png" },
+        undefined,
+        { caption: "Kirim /verify KODE untuk lanjut." },
+      );
+      // Verify global: siapa pun yang mengirim kode benar akan membuka akses
+      // untuk semua orang sampai commandCount kembali mencapai VERIFY_EVERY.
+      if (input?.name === "verify" && input.args.join("").toUpperCase() === captchaAnswer.code) {
         captchaAnswer = null;
+        captchaImage = null;
         commandCount = 0;
-        await message.reply("Oke, lanjut.");
+        await message.reply("Oke, lanjut Coy.");
+      } else if (input?.name === "verify") {
+        await message.reply("Kode salah Coy. Coba lagi.");
+        await resendCaptcha();
       } else {
-        if (input?.name === "verify") await message.reply("Kode salah. Coba lagi.");
-        else await message.reply("Kirim /verify KODE sesuai gambar dulu.");
+        await message.reply("Kirim /verify KODE sesuai gambar dulu.");
+        await resendCaptcha();
       }
       return;
     }
     if (input) {
       commandCount++;
-      if (commandCount === 5) {
+      if (commandCount === VERIFY_EVERY) {
         const code = crypto.randomBytes(3).toString("hex").toUpperCase();
-        captchaAnswer = { code, sender: raw.key.participant || raw.key.remoteJid };
+        captchaAnswer = { code };
         const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="160"><rect width="100%" height="100%" fill="#f3f0e8"/><path d="M20 40L400 120M35 145L380 20M70 15L300 145" stroke="#777" stroke-width="3"/><text x="210" y="102" text-anchor="middle" font-family="sans-serif" font-size="58" font-weight="700" letter-spacing="8" fill="#202020">${code}</text></svg>`;
         const png = new Resvg(svg).render().asPng();
-        await message.reply({ mimetype: "image/png", data: png.toString("base64"), filename: "verify.png" }, undefined, { caption: "Kirim /verify KODE untuk lanjut." });
+        captchaImage = png.toString("base64");
+        await message.reply({ mimetype: "image/png", data: captchaImage, filename: "verify.png" }, undefined, { caption: "Kirim /verify KODE untuk lanjut." });
         return;
       }
       const command = commands.get(input.name);
