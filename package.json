@@ -1,5 +1,5 @@
 {
-  "name": "waresource-bot-md",
+  "name": "choco-source-bot-md",
   "version": "1.0.0",
   "description": "WhatsApp MD bot with menu, stiker, menfess, downloader, and brat commands.",
   "main": "index.js",

@@ -274,7 +274,7 @@ async function start(selectedMode) {
     logger: P({ level: "silent" }),
     printQRInTerminal: false,
     ...(version ? { version } : {}),
-    browser: Browsers.windows("VX Bot"),
+    browser: Browsers.windows("Choco Source"),
     markOnlineOnConnect: false,
     syncFullHistory: false,
     generateHighQualityLinkPreview: false,
@@ -346,7 +346,7 @@ async function chooseLoginMode() {
   }
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const ask = (question) => new Promise((resolve) => rl.question(question, resolve));
-  console.log("\nVX Bot | Pilih metode login");
+  console.log("\nChoco Source | Pilih metode login");
   console.log("1  Login QR");
   console.log("2  Login Pairing");
   console.log("3  Reset sesi");

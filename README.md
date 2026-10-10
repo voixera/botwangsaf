@@ -1,4 +1,4 @@
-# waresource-bot-md
+# choco-source-bot-md
 
 WhatsApp MD bot dengan menu, stiker, menfess, dan utilitas lain.
 

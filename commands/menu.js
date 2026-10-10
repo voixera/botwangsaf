@@ -5,7 +5,7 @@ const { MessageMedia } = require("whatsapp-web.js");
 module.exports = {
   name: "menu",
   aliases: ["help"],
-  description: "Menampilkan daftar command VX Bot.",
+  description: "Menampilkan daftar command Choco Source.",
   usage: "menu",
   async execute({ message, commands, state }) {
     const uniqueCommands = [...new Set(commands.values())].sort((a, b) =>
@@ -57,7 +57,7 @@ module.exports = {
       : "";
 
     const menuText = [
-      "╭━━〔 *VX Bot* 〕━━╮",
+      "╭━━〔 *Choco Source* 〕━━╮",
       "┃ Menu utama",
       "╰━━━━━━━━━━━━━━━━╯",
       "",

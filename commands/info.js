@@ -8,7 +8,7 @@ module.exports = {
   usage: "info",
   async execute({ message }) {
     await message.reply(
-      box("VX Bot", [
+      box("Choco Source", [
         `⌬ Versi  : ${pkg.version || "1.0.0"}`,
         `⌬ Node   : ${process.version}`,
         "⌬ Fitur  : media, menfess, utilitas",
